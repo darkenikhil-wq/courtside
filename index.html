@@ -660,11 +660,18 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     The visible form is JS-rendered later, but Netlify parses static HTML at
     upload time and won't auto-pick up dynamic forms. This stub gives the
     schema; visible form POSTs with the same name and Netlify intercepts.
+
+    NOTE: every field present in the visible form's submission must also be
+    declared here (Netlify rejects submissions with unknown fields).
+    Using inline display:none rather than `hidden` for max-compatibility.
+
     Configure the destination email at:
-      Netlify Site → Forms → contact → Settings → Add Notification → Email →
-      send to support@courtsidereservations.com
+      Netlify Site → Forms → contact → Settings & usage → Form notifications
+      → Add notification → Email → support@courtsidereservations.com
   -->
-  <form name="contact" data-netlify="true" netlify-honeypot="bot-field" hidden>
+  <form name="contact" method="POST" data-netlify="true" netlify-honeypot="bot-field" style="display:none;">
+    <input type="hidden" name="form-name" value="contact">
+    <input type="text" name="bot-field">
     <input type="text" name="name">
     <input type="email" name="email">
     <textarea name="message"></textarea>
@@ -1516,7 +1523,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       wireBackLink();
     }
 
-    const CONTACT_EMAIL = 'courtsidereservations@gmail.com';
+    const CONTACT_EMAIL = 'support@courtsidereservations.com';
 
     // Email validation — intentionally simple (RFC-perfect regex is overkill).
     // Rejects empty / no @ / no dot-after-@ / spaces.
@@ -1646,20 +1653,33 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         // Netlify Forms: POST application/x-www-form-urlencoded to "/".
         // form-name must be included; Netlify routes to the matching form schema
         // declared in the static HTML at the top of <body>.
+        // 15s timeout so the button never stays stuck on "Sending…" if Netlify
+        // never responds (form not detected, network drop, etc.).
         const data = new URLSearchParams(new FormData(form)).toString();
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 15000);
+
         fetch('/', {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
           body: data,
+          signal: controller.signal,
         }).then((res) => {
+          clearTimeout(timeout);
+          console.log('[contact form] response:', res.status, res.statusText);
           if (!res.ok) throw new Error('Submit failed: ' + res.status);
           track('contact_sent', {});
           form.hidden = true;
           successEl.hidden = false;
-        }).catch(() => {
+        }).catch((err) => {
+          clearTimeout(timeout);
+          console.error('[contact form] fetch error:', err);
           submitBtn.disabled = false;
           submitBtn.textContent = 'Send';
-          errEl.textContent = "Couldn't send right now. Try again, or email us at " + CONTACT_EMAIL + ".";
+          const msg = (err && err.name === 'AbortError')
+            ? 'Request timed out. Check that Netlify Forms is enabled, or email us at ' + CONTACT_EMAIL + '.'
+            : "Couldn't send right now. Try again, or email us at " + CONTACT_EMAIL + '.';
+          errEl.textContent = msg;
         });
       });
 
