@@ -1,0 +1,28 @@
+<svg viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <defs>
+    <radialGradient id="bgGlow" cx="50%" cy="0%" r="70%">
+      <stop offset="0%" stop-color="#22D3EE" stop-opacity="0.14"/>
+      <stop offset="65%" stop-color="#22D3EE" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1200" height="630" fill="#0A0F16"/>
+  <rect width="1200" height="630" fill="url(#bgGlow)"/>
+
+  <!-- Logo mark on left -->
+  <g transform="translate(110, 145)">
+    <rect width="340" height="340" rx="72" fill="#161F2B" stroke="#22D3EE" stroke-opacity="0.15" stroke-width="1"/>
+    <g transform="translate(0, 0) scale(0.664)">
+      <path d="M 372 168 A 132 132 0 1 0 372 344"
+            fill="none" stroke="#22D3EE" stroke-width="58" stroke-linecap="round"/>
+      <circle cx="372" cy="256" r="30" fill="#22D3EE"/>
+    </g>
+  </g>
+
+  <!-- Wordmark on right -->
+  <g transform="translate(530, 240)">
+    <text x="0" y="0" font-family="Georgia, 'Times New Roman', serif" font-style="italic" font-weight="900" font-size="92" fill="#F1F5F9" letter-spacing="-2">Courtside</text>
+    <text x="0" y="86" font-family="-apple-system, 'Helvetica Neue', sans-serif" font-weight="500" font-size="48" fill="#22D3EE" letter-spacing="-0.5">Reservations</text>
+    <text x="0" y="170" font-family="-apple-system, 'Helvetica Neue', sans-serif" font-weight="400" font-size="26" fill="#8B96A8" letter-spacing="0.2">Book Arlington courts in two taps.</text>
+  </g>
+</svg>
