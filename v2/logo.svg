@@ -1,0 +1,16 @@
+<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="512" rx="108" fill="#0A0F16"/>
+  <!-- Subtle cyan glow at top -->
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="0%" r="65%">
+      <stop offset="0%" stop-color="#22D3EE" stop-opacity="0.18"/>
+      <stop offset="60%" stop-color="#22D3EE" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" rx="108" fill="url(#glow)"/>
+  <!-- Thick C arc -->
+  <path d="M 372 168 A 132 132 0 1 0 372 344"
+        fill="none" stroke="#22D3EE" stroke-width="58" stroke-linecap="round"/>
+  <!-- Ball dot inside the opening -->
+  <circle cx="372" cy="256" r="30" fill="#22D3EE"/>
+</svg>
