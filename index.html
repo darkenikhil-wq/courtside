@@ -1328,20 +1328,40 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           </svg>
         </div>
         <h1>Location <em>blocked</em></h1>
+        <p class="perm-body" style="margin-bottom: 20px;">
+          This is usually a system setting — not something you did in the browser.
+        </p>
         <div class="reenable">
-          <strong>To re-enable on iPhone Safari:</strong>
+          <strong>Enable location on iPhone:</strong>
           <ol>
-            <li>Tap the <strong>aA</strong> icon at the left of the URL bar</li>
-            <li>Tap <strong>Website Settings</strong></li>
-            <li>Set <strong>Location</strong> to <strong>Ask</strong> or <strong>Allow</strong></li>
-            <li>Reload this page</li>
+            <li>Open the <strong>Settings</strong> app</li>
+            <li>Tap <strong>Privacy & Security</strong></li>
+            <li>Tap <strong>Location Services</strong></li>
+            <li>Make sure the top toggle is <strong>ON</strong></li>
+            <li>Scroll down, tap <strong>Safari Websites</strong></li>
+            <li>Select <strong>While Using the App</strong></li>
           </ol>
-          <p style="margin: 12px 0 0; font-size: 13px; color: var(--muted);">
-            Or just open this URL in a <strong>Private</strong> Safari tab for a fresh prompt.
-          </p>
         </div>
-        <button class="btn btn-primary" id="retryBtn">Try again</button>
+        <div id="troubleshootingExtra" style="display: none;">
+          <div class="reenable" style="margin-top: 12px;">
+            <strong>Still blocked? Check Safari's per-site setting:</strong>
+            <ol>
+              <li>Tap the <strong>aA</strong> icon in Safari's URL bar</li>
+              <li>Tap <strong>Website Settings</strong></li>
+              <li>Set <strong>Location</strong> to <strong>Ask</strong> or <strong>Allow</strong></li>
+              <li>Reload this page</li>
+            </ol>
+          </div>
+          <div class="reenable" style="margin-top: 12px;">
+            <strong>Opened from iMessage, Instagram, or another app?</strong>
+            <p style="margin: 8px 0 0; font-size: 13px; color: var(--muted); line-height: 1.5;">
+              In-app browsers block location entirely. Tap the share icon (↑) and choose <strong>Open in Safari</strong>.
+            </p>
+          </div>
+        </div>
+        <button class="btn btn-primary" id="retryBtn" style="margin-top: 22px;">Try again</button>
         <button class="btn btn-outline" id="pickBtn">Pick a court manually</button>
+        <button class="btn btn-secondary" id="troubleshootBtn">Still stuck? More help →</button>
         <button class="btn btn-secondary" id="skipBtn">Just open the booking site</button>
       `;
       document.getElementById('retryBtn').addEventListener('click', () => location.reload());
@@ -1349,6 +1369,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         location.href = webtracAllCourtsUrl();
       });
       document.getElementById('pickBtn').addEventListener('click', () => renderFallback());
+      document.getElementById('troubleshootBtn').addEventListener('click', () => {
+        const extra = document.getElementById('troubleshootingExtra');
+        const btn = document.getElementById('troubleshootBtn');
+        extra.style.display = 'block';
+        btn.style.display = 'none';
+      });
       wireBackLink();
     }
 
