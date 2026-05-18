@@ -1198,12 +1198,33 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       initBookingPrefsIfNeeded();
       return isoToWebtracDate(bookingPrefs.date);
     }
-    function bookingBeginTime() {
-      initBookingPrefsIfNeeded();
-      return time24toWebtracTime(bookingPrefs.time);
-    }
-    function bookingBlocksToDisplay() {
-      return durationToBlocks(bookingPrefs.duration);
+    // WebTrac display window: ALWAYS 8am–9pm so the user lands on a familiar
+    // full-day grid where they can click adjacent slots to extend if needed.
+    // The user's picked time is still passed to WebTrac, but via the slot's
+    // direct cart-add URL (GlobalSalesArea_FRItemBeginTime), not via the
+    // search-display begintime.
+    const WEBTRAC_DISPLAY_BEGIN_TIME = '08:00 am';
+    const WEBTRAC_DISPLAY_BLOCKS     = '26';      // 8am → 9pm in 30-min blocks
+
+    function bookingBeginTime()       { return WEBTRAC_DISPLAY_BEGIN_TIME; }
+    function bookingBlocksToDisplay() { return WEBTRAC_DISPLAY_BLOCKS; }
+
+    // When the user picks a specific time AND we have its live cart-add URL,
+    // combine: slot adds to cart + search params render the full 8am–9pm grid
+    // around it (so they can extend the booking with adjacent slot clicks if
+    // they want 60 or 90 min).
+    function buildCartAddUrl(slotBookingUrl, court) {
+      const url = new URL(slotBookingUrl, 'https://vaarlingtonweb.myvscloud.com/');
+      url.searchParams.set('type', SPORTS[selectedSport].type);
+      url.searchParams.set('location', court.code);
+      url.searchParams.set('date', bookingDate());
+      url.searchParams.set('begintime', WEBTRAC_DISPLAY_BEGIN_TIME);
+      url.searchParams.set('blockstodisplay', WEBTRAC_DISPLAY_BLOCKS);
+      url.searchParams.set('display', 'Detail');
+      url.searchParams.set('search', 'yes');
+      url.searchParams.set('module', 'FR');
+      url.searchParams.set('frheadcount', '0');
+      return url.toString();
     }
 
     // -------------------- Availability (live slot data via Netlify Function) --------------------
@@ -1835,14 +1856,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         });
 
         document.getElementById('openWebtracBtn').addEventListener('click', () => {
-          // Prefer the live booking URL for the selected slot — visiting it
-          // directly adds that 30-min slot to the user's WebTrac cart in a
-          // fresh session, skipping the search page entirely.
-          // Falls back to the search URL if availability hasn't loaded or the
-          // slot has no URL (covers all error / pre-fetch cases gracefully).
+          // Prefer the live cart-add URL for the selected slot — combined with
+          // the search params, this lands the user on the full 8am–9pm grid
+          // with their slot already in the WebTrac cart. Falls back to the
+          // plain search URL if availability didn't load.
           const slotUrl = selectedSlotBookingUrl();
           const fallbackUrl = webtracUrl(court.code);
-          const url = slotUrl || fallbackUrl;
+          const url = slotUrl ? buildCartAddUrl(slotUrl, court) : fallbackUrl;
           console.log('[booking] opening WebTrac with prefs:', {
             court: court.id,
             sport: selectedSport,
