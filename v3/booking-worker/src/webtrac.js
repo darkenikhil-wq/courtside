@@ -367,9 +367,9 @@ async function login(page) {
       await username.first().fill(config.webtracUsername);
       await password.first().fill(config.webtracPassword);
       await clickLogin(page);
-      await page.waitForLoadState('domcontentloaded', { timeout: 15000 }).catch(() => {});
-      await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+      await waitForLoginSettle(page);
       await handleActiveSessionPrompt(page);
+      await waitForLoginSettle(page);
       await assertLoggedIn(page);
       return;
     }
@@ -393,14 +393,35 @@ async function clickLogin(page) {
   ];
   for (const locator of candidates) {
     if (await locator.count()) {
-      await Promise.all([
-        page.waitForLoadState('domcontentloaded', { timeout: 15000 }).catch(() => {}),
-        locator.first().click(),
-      ]);
+      await clickAndWaitForPageChange(page, locator.first());
       return;
     }
   }
   throw codedError('LOGIN_BUTTON_NOT_FOUND', 'Could not find a WebTrac login submit control.');
+}
+
+async function clickAndWaitForPageChange(page, locator) {
+  const beforeUrl = page.url();
+  await Promise.all([
+    Promise.race([
+      page.waitForURL((url) => String(url) !== beforeUrl, { timeout: 20000 }),
+      page.locator('input[type="password"]').first().waitFor({ state: 'hidden', timeout: 20000 }),
+      page.getByText(/active session already exists|continue with login|logout|log out|invalid|incorrect/i).first().waitFor({ timeout: 20000 }),
+    ]).catch(() => {}),
+    locator.click(),
+  ]);
+  await page.waitForLoadState('domcontentloaded', { timeout: 15000 }).catch(() => {});
+  await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+}
+
+async function waitForLoginSettle(page) {
+  for (let i = 0; i < 6; i += 1) {
+    const bodyText = await page.locator('body').innerText({ timeout: 5000 }).catch(() => '');
+    if (/active session already exists|continue with login|logout|log out|invalid|incorrect/i.test(bodyText)) return;
+    const passwordVisible = await page.locator('input[type="password"]').filter({ visible: true }).count().catch(() => 0);
+    if (!passwordVisible && !/sign in\s*\/\s*register/i.test(bodyText)) return;
+    await page.waitForTimeout(1000);
+  }
 }
 
 async function assertLoggedIn(page) {
@@ -427,11 +448,7 @@ async function handleActiveSessionPrompt(page) {
   ];
   for (const locator of candidates) {
     if (await locator.count()) {
-      await Promise.all([
-        page.waitForLoadState('domcontentloaded', { timeout: 15000 }).catch(() => {}),
-        locator.first().click(),
-      ]);
-      await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+      await clickAndWaitForPageChange(page, locator.first());
       return true;
     }
   }
