@@ -1,0 +1,32 @@
+# Netlify config — explicitly declares the functions directory so Netlify Drop
+# sites (which don't run a build step) still detect and deploy functions.
+#
+# Without this file, Drop deploys sometimes upload the function file but fail
+# to register it as a serverless endpoint — visible as a 404 on /.netlify/functions/*.
+
+[build]
+  publish = "."
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"
+
+[[headers]]
+  for = "/"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
+[[headers]]
+  for = "/.netlify/functions/*"
+  [headers.values]
+    Cache-Control = "no-store"

@@ -443,6 +443,285 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       text-align: center;
       margin: 8px 0 4px;
     }
+    /* v3: When picker — date + time + duration on the closest-court screen */
+    .when-picker {
+      margin: 18px 0 14px;
+      padding: 14px 16px;
+      background: var(--card-elev);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      text-align: left;
+    }
+    .when-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin: 0 0 10px;
+    }
+    .when-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .when-input {
+      width: 100%;
+      padding: 12px 14px;
+      background: var(--card);
+      border: 1.5px solid var(--line);
+      border-radius: 10px;
+      color: var(--ink);
+      font-family: inherit;
+      font-size: 15px;
+      font-weight: 500;
+      transition: border-color 0.15s;
+      /* Normalize native date/time picker appearance across iOS/Android */
+      -webkit-appearance: none;
+      appearance: none;
+      color-scheme: dark;
+    }
+    .when-input:focus { outline: none; border-color: rgba(var(--accent-rgb), 0.50); }
+    .duration-toggle {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .seg {
+      padding: 10px 12px;
+      background: var(--card);
+      border: 1.5px solid var(--line);
+      border-radius: 10px;
+      color: var(--muted);
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s, background 0.15s;
+    }
+    .seg:hover { border-color: rgba(var(--accent-rgb), 0.30); }
+    .seg.active {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: rgba(var(--accent-rgb), 0.06);
+    }
+    .booking-range {
+      margin-top: 14px;
+      padding: 10px 12px;
+      background: rgba(var(--accent-rgb), 0.08);
+      border: 1px solid rgba(var(--accent-rgb), 0.30);
+      border-radius: 10px;
+      font-weight: 500;
+      font-size: 16px;
+      color: var(--ink);
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+    }
+    .court-unit-picker {
+      margin-top: 14px;
+    }
+    .court-unit-picker[hidden] { display: none; }
+    .court-unit-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+      gap: 8px;
+    }
+    .court-unit-btn {
+      min-height: 70px;
+      padding: 10px;
+      background: var(--card);
+      border: 1.5px solid var(--line);
+      border-radius: 8px;
+      color: var(--ink);
+      font-family: inherit;
+      text-align: left;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s, transform 0.15s;
+    }
+    .court-unit-btn:hover {
+      border-color: rgba(var(--accent-rgb), 0.35);
+      transform: translateY(-1px);
+    }
+    .court-unit-btn.active {
+      border-color: var(--accent);
+      background: rgba(var(--accent-rgb), 0.08);
+    }
+    .court-unit-name {
+      display: block;
+      font-weight: 700;
+      font-size: 14px;
+      line-height: 1.2;
+    }
+    .court-unit-meta {
+      display: block;
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.25;
+    }
+    .avail-status {
+      margin-top: 10px;
+      font-size: 12px;
+      color: var(--muted);
+      min-height: 1em;
+      text-align: left;
+    }
+    .reserve-status {
+      margin: 2px 0 12px;
+      padding: 11px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.035);
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+      text-align: left;
+    }
+    .reserve-status[hidden] { display: none; }
+    .reserve-status.ok {
+      border-color: rgba(var(--accent-rgb), 0.35);
+      background: rgba(var(--accent-rgb), 0.08);
+      color: var(--ink);
+    }
+    .reserve-status.warn {
+      border-color: rgba(248, 113, 113, 0.35);
+      background: rgba(248, 113, 113, 0.08);
+      color: var(--ink);
+    }
+    .payment-panel {
+      margin: 8px 0 12px;
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(var(--accent-rgb), 0.28);
+      background: rgba(var(--accent-rgb), 0.07);
+      text-align: left;
+    }
+    .payment-panel[hidden] { display: none; }
+    .payment-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 10px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .payment-amount {
+      font-size: 20px;
+      line-height: 1;
+      color: var(--ink);
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+    .payment-element {
+      padding: 10px;
+      border-radius: 10px;
+      background: #fff;
+    }
+    .booking-disclosure {
+      margin: 10px 0;
+      font-size: 12px;
+      line-height: 1.45;
+      color: var(--muted);
+    }
+    .agreement-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 1200;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      background: rgba(4, 8, 13, 0.72);
+      backdrop-filter: blur(10px);
+    }
+    .agreement-backdrop[hidden] { display: none; }
+    .agreement-sheet {
+      width: min(100%, 430px);
+      max-height: min(720px, calc(100vh - 40px));
+      overflow: auto;
+      padding: 22px;
+      border-radius: 20px;
+      border: 1px solid rgba(var(--accent-rgb), 0.26);
+      background: var(--card);
+      box-shadow: 0 24px 70px -28px rgba(0, 0, 0, 0.70);
+      text-align: left;
+    }
+    .agreement-kicker {
+      margin: 0 0 8px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+    .agreement-title {
+      margin: 0 0 10px;
+      font-size: 24px;
+      line-height: 1.15;
+      color: var(--ink);
+    }
+    .agreement-summary {
+      margin: 0 0 14px;
+      font-size: 14px;
+      line-height: 1.5;
+      color: var(--muted);
+    }
+    .agreement-list {
+      display: grid;
+      gap: 9px;
+      margin: 0 0 16px;
+      padding: 0;
+      list-style: none;
+    }
+    .agreement-list li {
+      padding: 10px 11px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: rgba(255,255,255,0.035);
+      color: var(--ink);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    .agreement-check {
+      display: grid;
+      grid-template-columns: 20px 1fr;
+      gap: 10px;
+      align-items: start;
+      margin: 0 0 16px;
+      color: var(--ink);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    .agreement-check input {
+      width: 18px;
+      height: 18px;
+      margin: 2px 0 0;
+      accent-color: var(--accent);
+    }
+    .agreement-actions {
+      display: grid;
+      grid-template-columns: 1fr 1.35fr;
+      gap: 10px;
+    }
+    .agreement-actions .btn { margin-bottom: 0; }
+    @media (max-width: 480px) {
+      .agreement-sheet { padding: 20px; border-radius: 18px; }
+      .agreement-actions { grid-template-columns: 1fr; }
+    }
+    .payment-status {
+      margin-top: 8px;
+      min-height: 1em;
+      font-size: 12px;
+      line-height: 1.4;
+      color: var(--muted);
+    }
+    .payment-status.ok { color: var(--ink); }
+    .payment-status.warn { color: #fecaca; }
+    /* Disabled options in the time <select> get a softer color so unavailable
+       slots read as "you can't pick this" not "I'm broken". */
+    .when-input option:disabled { color: var(--muted); }
+
     /* Modules — used on the Work with us page (and reusable for other multi-section pages) */
     .module {
       background: var(--card-elev);
@@ -470,6 +749,128 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     .module .btn { margin-bottom: 0; }
     .module .notify-form { margin: 0; }
     .module .notify-fineprint { margin-top: 0; }
+    .support-amounts {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      margin: 10px 0;
+    }
+    .support-amount {
+      min-height: 44px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.04);
+      color: var(--ink);
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .support-amount.active {
+      border-color: rgba(var(--accent-rgb), 0.55);
+      background: rgba(var(--accent-rgb), 0.12);
+      color: var(--accent);
+    }
+    .support-custom {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      align-items: center;
+      gap: 8px;
+      margin: 0 0 10px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .support-custom input {
+      width: 100%;
+      min-height: 42px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.04);
+      color: var(--ink);
+      padding: 0 12px;
+      font: inherit;
+    }
+    .support-payment {
+      margin-top: 12px;
+      display: grid;
+      gap: 10px;
+    }
+    .support-payment[hidden] { display: none; }
+    .coach-card {
+      display: grid;
+      gap: 14px;
+      padding: 16px;
+      background: var(--card-elev);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      text-align: left;
+      margin-bottom: 14px;
+    }
+    .coach-top {
+      display: grid;
+      grid-template-columns: 78px 1fr;
+      gap: 14px;
+      align-items: center;
+    }
+    .coach-photo {
+      width: 78px;
+      height: 78px;
+      border-radius: 14px;
+      overflow: hidden;
+      background: rgba(var(--accent-rgb), 0.10);
+      border: 1px solid rgba(var(--accent-rgb), 0.24);
+      display: grid;
+      place-items: center;
+      color: var(--accent);
+      font-weight: 800;
+      font-size: 22px;
+    }
+    .coach-photo img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .coach-name {
+      margin: 0 0 4px;
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--ink);
+    }
+    .coach-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .coach-pill {
+      border: 1px solid rgba(var(--accent-rgb), 0.26);
+      background: rgba(var(--accent-rgb), 0.07);
+      color: var(--ink);
+      border-radius: 999px;
+      padding: 5px 8px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .coach-bio {
+      margin: 0;
+      color: var(--ink);
+      font-size: 14px;
+      line-height: 1.55;
+    }
+    .coach-focus {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    .coach-focus span {
+      padding: 9px 8px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      color: var(--muted);
+      text-align: center;
+      font-size: 12px;
+      font-weight: 600;
+    }
 
     .toast {
       position: fixed;
@@ -533,6 +934,99 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       padding: 3px 8px;
       border-radius: 999px;
     }
+    .time-search-actions {
+      display: grid;
+      gap: 10px;
+      margin-top: 14px;
+    }
+    .search-summary {
+      margin: 0 0 14px;
+      padding: 11px 12px;
+      border-radius: 10px;
+      background: rgba(var(--accent-rgb), 0.07);
+      border: 1px solid rgba(var(--accent-rgb), 0.24);
+      color: var(--ink);
+      font-size: 13px;
+      line-height: 1.45;
+      text-align: left;
+    }
+    .result-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .result-card {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+      padding: 14px 16px;
+      background: var(--card-elev);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      color: var(--ink);
+      text-decoration: none;
+      transition: border-color 0.15s, transform 0.05s;
+    }
+    .result-card:hover { border-color: rgba(var(--accent-rgb), 0.45); }
+    .result-card:active { transform: scale(0.99); }
+    .result-card.disabled {
+      opacity: 0.58;
+      pointer-events: none;
+    }
+    .result-main {
+      display: grid;
+      gap: 4px;
+      text-align: left;
+    }
+    .result-name {
+      font-size: 15px;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+    .result-meta {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.3;
+    }
+    .result-status {
+      min-width: 86px;
+      padding: 7px 9px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      text-align: center;
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+    }
+    .result-status.open {
+      border-color: rgba(var(--accent-rgb), 0.45);
+      background: rgba(var(--accent-rgb), 0.10);
+      color: var(--accent);
+    }
+    .result-status.full {
+      border-color: rgba(248, 113, 113, 0.32);
+      background: rgba(248, 113, 113, 0.08);
+      color: #fecaca;
+    }
+    .result-status.warn {
+      border-color: rgba(251, 191, 36, 0.32);
+      background: rgba(251, 191, 36, 0.08);
+      color: #fde68a;
+    }
+    .results-toolbar {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 14px;
+    }
+    .show-more-results {
+      margin-top: 12px;
+      margin-bottom: 0;
+    }
+    .results-toolbar .btn { margin-bottom: 0; }
     .error {
       color: var(--error);
       background: rgba(220, 38, 38, 0.08);
@@ -577,7 +1071,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       cursor: pointer;
       transition: transform 0.05s ease, opacity 0.15s ease;
     }
+    [hidden] { display: none !important; }
     .btn:active { transform: scale(0.98); }
+    .btn:disabled {
+      cursor: wait;
+      opacity: 0.68;
+      transform: none;
+    }
     .btn-primary {
       background: var(--accent);
       color: #0A0F16;
@@ -651,6 +1151,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     @media (max-width: 480px) {
       .card { padding: 36px 24px 28px; border-radius: 24px; }
       h1 { font-size: 32px; }
+      .result-card { grid-template-columns: 1fr; align-items: stretch; }
+      .result-status { width: max-content; min-width: 0; }
+      .results-toolbar { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -682,7 +1185,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       <!-- content injected by script -->
     </div>
     <footer class="app-footer">
-      <a href="?view=coming-soon&cat=coaches" data-cta-id="footer-coach" data-icon="coach">Coaches</a>
+      <a href="?view=coaches" data-cta-id="footer-coach" data-icon="coach">Coaches</a>
       <span class="dot">·</span>
       <a href="?view=coming-soon&cat=leagues" data-cta-id="footer-league" data-icon="trophy">Leagues</a>
       <span class="dot">·</span>
@@ -694,10 +1197,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
   <script>
     // -------------------- Court data --------------------
-    // To add a court: drop in name, lat/lng (Google Maps right-click → copy coords),
-    // and WebTrac location code (from the Location dropdown's resulting URL).
-    // VERIFY: every `code` and lat/lng below was entered by hand and must be
-    // confirmed against the live WebTrac Location dropdown + a real map check.
+    // To add a court: drop in name, lat/lng from the official Arlington facility
+    // page (or APS page for school courts), and WebTrac location code from the
+    // Location dropdown's resulting URL.
     //
     //   How to verify a `code`:
     //     1. Open https://vaarlingtonweb.myvscloud.com/webtrac/web/search.html?type=TENNIS&module=FR
@@ -705,8 +1207,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     //     3. The resulting URL contains `location=XXXX` — that's the code
     //
     //   How to verify lat/lng:
-    //     Google Maps → find the actual tennis/pickle/volleyball court (not the
-    //     park entrance) → right-click on the court → copy coordinates.
+    //     Use the official Arlington facility page's embedded map coordinate
+    //     first; for school courts, use the APS/school listing and a map check.
     //
     //   Known-to-be-guesses that should be double-checked first:
     //     - virginia-highlands  code: 'VA-H'    (possible: 'VA-H', 'VAH', 'VAHGH')
@@ -724,32 +1226,32 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     //     notes     (string)  — short one-liner (e.g. "Walk-up only on weekends")
     //   These are NOT filled in yet — fill in as you confirm each.
     const COURTS = [
-      { id: 'barcroft',           name: 'Barcroft Park',           lat: 38.8440, lng: -77.1060, code: 'BARCR', sports: ['tennis', 'volleyball'] },
-      { id: 'bluemont',           name: 'Bluemont Park',           lat: 38.8720, lng: -77.1300, code: 'BLUE',  sports: ['tennis'] },
-      { id: 'bon-air',            name: 'Bon Air Park',            lat: 38.8800, lng: -77.1330, code: 'BONA',  sports: ['tennis'] },
-      { id: 'carver',             name: 'Carver Center',           lat: 38.8640, lng: -77.0630, code: 'CARV',  sports: ['tennis'] },
-      { id: 'fairlington',        name: 'Fairlington Center',      lat: 38.8320, lng: -77.0920, code: 'FAIR',  sports: ['tennis'] },
-      { id: 'fort-scott',         name: 'Fort Scott Park',         lat: 38.8530, lng: -77.0570, code: 'FSCOT', sports: ['tennis', 'pickleball'] },
-      { id: 'glebe',              name: 'Glebe Park',              lat: 38.8860, lng: -77.1180, code: 'GLEBP', sports: ['tennis', 'pickleball'] },
-      { id: 'greenbrier',         name: 'Greenbrier Park',         lat: 38.8970, lng: -77.1370, code: 'GREEN', sports: ['tennis'] },
-      { id: 'gunston',            name: 'Gunston Park',            lat: 38.8520, lng: -77.0800, code: 'GUNP',  sports: ['tennis'] },
-      { id: 'hayes',              name: 'Hayes Park',              lat: 38.8800, lng: -77.0990, code: 'HAYES', sports: ['tennis', 'pickleball'] },
-      { id: 'jamestown',          name: 'Jamestown Park',          lat: 38.9180, lng: -77.1550, code: 'JAMEP', sports: ['tennis'] },
-      { id: 'jennie-dean',        name: 'Jennie Dean Park',        lat: 38.8720, lng: -77.0850, code: 'JDEAN', sports: ['tennis'] },
-      { id: 'kenmore',            name: 'Kenmore MS',              lat: 38.8750, lng: -77.1240, code: 'KEN',   sports: ['tennis'] },
-      { id: 'langston-brown',     name: 'Langston-Brown',          lat: 38.8920, lng: -77.1310, code: 'LANGS', sports: ['tennis'] },
-      { id: 'lyon-village',       name: 'Lyon Village Park',       lat: 38.8945, lng: -77.0926, code: 'LYON',  sports: ['tennis'] },
-      { id: 'madison-manor',      name: 'Madison Manor Park',      lat: 38.8920, lng: -77.1500, code: 'MADM',  sports: ['tennis'] },
-      { id: 'marcey-road',        name: 'Marcey Road Park',        lat: 38.9130, lng: -77.1100, code: 'MARCY', sports: ['tennis', 'pickleball'] },
-      { id: 'maury',              name: 'Maury Park',              lat: 38.8860, lng: -77.1050, code: 'MAURY', sports: ['tennis'] },
-      { id: 'quincy',             name: 'Quincy Park',             lat: 38.8843, lng: -77.1064, code: 'QUINC', sports: ['tennis', 'volleyball'] },
-      { id: 'stratford',          name: 'Stratford Park',          lat: 38.9010, lng: -77.1400, code: 'STRAT', sports: ['tennis'] },
-      { id: 'thomas-jefferson',   name: 'Thomas Jefferson Center', lat: 38.8600, lng: -77.0920, code: 'TJ',    sports: ['tennis'] },
-      { id: 'towers',             name: 'Towers Park',             lat: 38.8900, lng: -77.0870, code: 'TOWER', sports: ['tennis', 'volleyball'] },
-      { id: 'tuckahoe',           name: 'Tuckahoe Park',           lat: 38.8950, lng: -77.1430, code: 'TUCKP', sports: ['tennis'] },
-      { id: 'utah',               name: 'Utah Park',               lat: 38.8820, lng: -77.1580, code: 'UTAH',  sports: ['volleyball'] },
-      { id: 'virginia-highlands', name: 'Virginia Highlands Park', lat: 38.8600, lng: -77.0617, code: 'VA-H',  sports: ['tennis', 'volleyball', 'pickleball'] },
-      { id: 'westover',           name: 'Westover Park',           lat: 38.8800, lng: -77.1460, code: 'WESTO', sports: ['volleyball'] },
+      { id: 'barcroft',           name: 'Barcroft Park',                         lat: 38.8505704, lng: -77.1020494, code: 'BARCR', sports: ['tennis', 'volleyball'] },
+      { id: 'bluemont',           name: 'Bluemont Park',                         lat: 38.8695020, lng: -77.1323060, code: 'BLUE',  sports: ['tennis'] },
+      { id: 'bon-air',            name: 'Bon Air Park',                          lat: 38.8755314, lng: -77.1325117, code: 'BONA',  sports: ['tennis'] },
+      { id: 'carver',             name: 'Carver Community Center',               lat: 38.8617358, lng: -77.0711967, code: 'CARV',  sports: ['tennis'] },
+      { id: 'fairlington',        name: 'Fairlington Community Center & Park',   lat: 38.8344329, lng: -77.0874290, code: 'FAIR',  sports: ['tennis'] },
+      { id: 'fort-scott',         name: 'Fort Scott Park',                       lat: 38.8465466, lng: -77.0589256, code: 'FSCOT', sports: ['tennis', 'pickleball'] },
+      { id: 'glebe',              name: 'Glebe Road Park',                       lat: 38.9217827, lng: -77.1263818, code: 'GLEBP', sports: ['tennis', 'pickleball'] },
+      { id: 'greenbrier',         name: 'Greenbrier Park',                       lat: 38.9007084, lng: -77.1398990, code: 'GREEN', sports: ['tennis'] },
+      { id: 'gunston',            name: 'Gunston Park',                          lat: 38.8470600, lng: -77.0700720, code: 'GUNP',  sports: ['tennis'] },
+      { id: 'hayes',              name: 'Hayes Park',                            lat: 38.8897071, lng: -77.1042210, code: 'HAYES', sports: ['tennis', 'pickleball'] },
+      { id: 'jamestown',          name: 'Jamestown Park',                        lat: 38.9168510, lng: -77.1414140, code: 'JAMEP', sports: ['tennis'] },
+      { id: 'jennie-dean',        name: 'Jennie Dean Park',                      lat: 38.8439331, lng: -77.0873448, code: 'JDEAN', sports: ['tennis'] },
+      { id: 'kenmore',            name: 'Kenmore Middle School',                 lat: 38.8655169, lng: -77.1297975, code: 'KEN',   sports: ['tennis'] },
+      { id: 'langston-brown',     name: 'Langston-Brown Community Center',       lat: 38.8959705, lng: -77.1266741, code: 'LANGS', sports: ['tennis'] },
+      { id: 'lyon-village',       name: 'Lyon Village Park',                     lat: 38.8937180, lng: -77.0947330, code: 'LYON',  sports: ['tennis'] },
+      { id: 'madison-manor',      name: 'Madison Manor Park',                    lat: 38.8825550, lng: -77.1498390, code: 'MADM',  sports: ['tennis'] },
+      { id: 'marcey-road',        name: 'Marcey Road Park',                      lat: 38.9107050, lng: -77.1096010, code: 'MARCY', sports: ['tennis', 'pickleball'] },
+      { id: 'maury',              name: 'Maury Park',                            lat: 38.8819386, lng: -77.1024012, code: 'MAURY', sports: ['tennis'] },
+      { id: 'quincy',             name: 'Quincy Park',                           lat: 38.8856109, lng: -77.1079805, code: 'QUINC', sports: ['tennis', 'volleyball'] },
+      { id: 'stratford',          name: 'Stratford Park',                        lat: 38.8997830, lng: -77.1136080, code: 'STRAT', sports: ['tennis'] },
+      { id: 'thomas-jefferson',   name: 'Thomas Jefferson Community Center',     lat: 38.8705019, lng: -77.0958233, code: 'TJ',    sports: ['tennis'] },
+      { id: 'towers',             name: 'Towers Park',                           lat: 38.8671088, lng: -77.0776606, code: 'TOWER', sports: ['tennis', 'volleyball'] },
+      { id: 'tuckahoe',           name: 'Tuckahoe Park',                         lat: 38.8922180, lng: -77.1578750, code: 'TUCKP', sports: ['tennis'] },
+      { id: 'utah',               name: 'Utah Park',                             lat: 38.8379943, lng: -77.0859565, code: 'UTAH',  sports: ['volleyball'] },
+      { id: 'virginia-highlands', name: 'Virginia Highlands Park',               lat: 38.8587766, lng: -77.0599123, code: 'VA-H',  sports: ['tennis', 'volleyball', 'pickleball'] },
+      { id: 'westover',           name: 'Westover Park',                         lat: 38.8801792, lng: -77.1357306, code: 'WESTO', sports: ['volleyball'] },
     ];
 
     const SPORTS = {
@@ -807,23 +1309,43 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     // Each CTA: id (used for tracking), label, icon (key in ICONS), url
     // External URLs open in a new tab; internal routes ("?view=...") open in same tab.
     // TODO: Replace placeholders below with real affiliate / payment URLs as you get them.
+    // External gear URLs — currently raw vendor URLs. TODO: replace each with
+    // your affiliate URL once you sign up (Tennis Warehouse, Pickleball Central
+    // and Midwest Volleyball Warehouse all have affiliate programs).
     const POST_BOOKING_CTAS = {
       tennis: [
-        { id: 't-coach',  label: 'Coaches?',      icon: 'coach',     url: '?view=coming-soon&cat=tennis-coach' },
-        { id: 't-league', label: 'Leagues?',      icon: 'trophy',    url: '?view=coming-soon&cat=tennis-league' },
-        { id: 't-work',   label: 'Work with us?', icon: 'briefcase', url: '?view=coming-soon&cat=work-with-us' },
+        { id: 't-coach',  label: 'Coaches',      icon: 'coach',     url: '?view=coaches' },
+        { id: 't-league', label: 'Leagues',      icon: 'trophy',    url: '?view=coming-soon&cat=tennis-league' },
+        { id: 't-gear',   label: 'Gear',         icon: 'bag',       url: 'https://www.tennis-warehouse.com/' },
+        { id: 't-work',   label: 'Work with us', icon: 'briefcase', url: '?view=coming-soon&cat=work-with-us' },
       ],
       pickleball: [
-        { id: 'pb-coach',  label: 'Coaches?',      icon: 'coach',     url: '?view=coming-soon&cat=pickleball-coach' },
-        { id: 'pb-league', label: 'Leagues?',      icon: 'trophy',    url: '?view=coming-soon&cat=pickleball-league' },
-        { id: 'pb-work',   label: 'Work with us?', icon: 'briefcase', url: '?view=coming-soon&cat=work-with-us' },
+        { id: 'pb-coach',  label: 'Coaches',      icon: 'coach',     url: '?view=coming-soon&cat=pickleball-coach' },
+        { id: 'pb-league', label: 'Leagues',      icon: 'trophy',    url: '?view=coming-soon&cat=pickleball-league' },
+        { id: 'pb-gear',   label: 'Gear',         icon: 'bag',       url: 'https://www.pickleballcentral.com/' },
+        { id: 'pb-work',   label: 'Work with us', icon: 'briefcase', url: '?view=coming-soon&cat=work-with-us' },
       ],
       volleyball: [
-        { id: 'vb-coach',  label: 'Coaches?',      icon: 'coach',     url: '?view=coming-soon&cat=volleyball-coach' },
-        { id: 'vb-league', label: 'Leagues?',      icon: 'trophy',    url: '?view=coming-soon&cat=volleyball-league' },
-        { id: 'vb-work',   label: 'Work with us?', icon: 'briefcase', url: '?view=coming-soon&cat=work-with-us' },
+        { id: 'vb-coach',  label: 'Coaches',      icon: 'coach',     url: '?view=coming-soon&cat=volleyball-coach' },
+        { id: 'vb-league', label: 'Leagues',      icon: 'trophy',    url: '?view=coming-soon&cat=volleyball-league' },
+        { id: 'vb-gear',   label: 'Gear',         icon: 'bag',       url: 'https://www.mvw.com/' },
+        { id: 'vb-work',   label: 'Work with us', icon: 'briefcase', url: '?view=coming-soon&cat=work-with-us' },
       ],
     };
+
+    const COACHES = [
+      {
+        id: 'sonny',
+        name: 'Coach Sonny',
+        title: 'PTR certified tennis professional',
+        initials: 'CS',
+        photo: null, // Drop the cleaned portrait at assets/coaches/sonny.jpg and set this path.
+        photoAlt: 'Coach Sonny holding a tennis racquet',
+        tags: ['20+ years', 'PTR certified', 'Adults & kids'],
+        focus: ['Technical', 'Fitness', 'Strategy'],
+        bio: `Coach Sonny is a PTR certified professional with over 20 years of teaching experience and a Master's in Public Health. He attended the Nick Bollettieri Tennis Academy and played club tennis at UVA. His lessons are high-energy, detail-oriented, and built around technical improvement, fitness, and strategy. Sonny works with adults and kids who love tennis and want to improve, tailoring each lesson to the student's level and pace while keeping it fun and active.`
+      },
+    ];
 
     // -------------------- Analytics --------------------
     // Plausible is the source of truth once the script tag in <head> is uncommented.
@@ -883,7 +1405,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     function courtsForSelectedSport() {
-      return COURTS.filter(c => c.sports.includes(selectedSport));
+      return COURTS
+        .filter(c => c.sports.includes(selectedSport))
+        .slice()
+        .sort((a, b) => a.name.localeCompare(b.name));
     }
 
     function formatDist(d) {
@@ -973,6 +1498,50 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       savePrefs({ lastCourt: courtId, lastCourtAt: Date.now() });
     }
 
+    const LOCAL_WORKER_URL_KEY = 'courtside_booking_worker_url_v1';
+    const LOCAL_WORKER_TOKEN_KEY = 'courtside_booking_worker_token_v1';
+
+    function configureLocalBookingWorkerFromUrl() {
+      const params = new URLSearchParams(location.search);
+      if (!params.has('bookingWorker') && !params.has('bookingToken')) return;
+
+      try {
+        if (params.has('bookingWorker')) {
+          const value = params.get('bookingWorker');
+          if (!value || value === 'off' || value === 'clear') {
+            localStorage.removeItem(LOCAL_WORKER_URL_KEY);
+            localStorage.removeItem(LOCAL_WORKER_TOKEN_KEY);
+          } else {
+            localStorage.setItem(LOCAL_WORKER_URL_KEY, value);
+          }
+        }
+        if (params.has('bookingToken')) {
+          const value = params.get('bookingToken');
+          if (value) localStorage.setItem(LOCAL_WORKER_TOKEN_KEY, value);
+        }
+      } catch (e) {}
+
+      params.delete('bookingWorker');
+      params.delete('bookingToken');
+      const clean = `${location.pathname}${params.toString() ? `?${params}` : ''}${location.hash}`;
+      history.replaceState(null, '', clean);
+    }
+
+    function localBookingWorkerConfig() {
+      configureLocalBookingWorkerFromUrl();
+      try {
+        const url = localStorage.getItem(LOCAL_WORKER_URL_KEY) || '';
+        const token = localStorage.getItem(LOCAL_WORKER_TOKEN_KEY) || '';
+        if (!url) return null;
+        const parsed = new URL(url);
+        if (!['localhost', '127.0.0.1', '[::1]'].includes(parsed.hostname)) return null;
+        return { url, token };
+      } catch (e) {
+        return null;
+      }
+    }
+    configureLocalBookingWorkerFromUrl();
+
     // -------------------- Feature 6: share --------------------
     // Share payload contains ONLY the public site URL and the court name.
     // Never the user's location, coordinates, or any personal data.
@@ -1018,37 +1587,589 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       toastTimer = setTimeout(() => el.classList.remove('show'), 1800);
     }
 
-    // Auto-route ("user is at the court") thresholds.
-    // Phone GPS error is routinely 20–50m (and worse under tree cover / urban),
-    // so a strict 0.1mi cutoff was too tight — a user literally on a court can
-    // read >0.1mi away. We auto-route if EITHER:
-    //   - nearest court is within AT_COURT_THRESHOLD_MI (absolute distance), OR
-    //   - "dominantly nearest" AND still reasonably close:
-    //       nearest.dist <= DOMINANT_NEAREST_MAX_MI
-    //       AND nearest.dist < second.dist * DOMINANT_NEAREST_RATIO
-    //
-    // The MAX_MI cap is critical: without it, a user 5mi from any court would
-    // get auto-routed to whichever single court is 5x closer than the next one.
-    // Far-away users must always land on the court-list fallback.
-    //
-    // Single-court case (some sports have only a few): use withinAbsolute only.
-    // Do NOT auto-route to a single court that's far away.
-    const AT_COURT_THRESHOLD_MI   = 0.25;
-    const DOMINANT_NEAREST_MAX_MI = 0.5;
-    const DOMINANT_NEAREST_RATIO  = 0.6;
+    // Auto-route only in the explicit "I'm at the court" flow. The normal
+    // booking journey is time-first and always shows options instead of jumping
+    // to whichever court is geographically nearest.
+    const AT_COURT_THRESHOLD_MI   = 0.12;
 
-    // WebTrac requires reservations at least 1 day out — default to tomorrow.
-    function bookingDate() {
+    // ==================== v3: Booking preferences + Arlington rules ====================
+    // User-selected date / time / duration drive Courtside's in-app booking intent.
+    //   date     'YYYY-MM-DD'   (native <input type="date">)
+    //   time     'HH:MM' 24h    (custom <select>, 30-min slots in operating hours)
+    //   duration 60 | 90 mins   (segmented toggle)
+    // Arlington publishes these rules: online court reservations are 60 or
+    // 90 minutes, at least 24 hours ahead, no more than 14 days ahead.
+    const BOOKING_MIN_DAYS_AHEAD = 1;
+    const BOOKING_MAX_DAYS_AHEAD = 14;
+
+    const bookingPrefs = { date: null, time: null, duration: 60 };
+    const selectedCourtUnits = new Map();
+
+    function formatLocalDate(d) {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
+    function dateFromISOAndTime(iso, hhmm) {
+      const [y, mo, d] = iso.split('-').map(Number);
+      const [h, m] = hhmm.split(':').map(Number);
+      return new Date(y, mo - 1, d, h, m, 0, 0);
+    }
+    function minBookingStartDateTime() {
+      return new Date(Date.now() + 24 * 60 * 60 * 1000);
+    }
+    function defaultBookingDateISO() {
       const d = new Date();
-      d.setDate(d.getDate() + 1);
-      const mm = String(d.getMonth() + 1).padStart(2, '0');
-      const dd = String(d.getDate()).padStart(2, '0');
-      return `${mm}/${dd}/${d.getFullYear()}`;
+      for (let offset = BOOKING_MIN_DAYS_AHEAD; offset <= BOOKING_MAX_DAYS_AHEAD; offset += 1) {
+        const candidate = new Date(d);
+        candidate.setDate(d.getDate() + offset);
+        const iso = formatLocalDate(candidate);
+        if (listBookingTimesForDate(bookingPrefs.duration, iso).length) return iso;
+      }
+      d.setDate(d.getDate() + BOOKING_MIN_DAYS_AHEAD);
+      return formatLocalDate(d);
+    }
+    function maxBookingDateISO() {
+      const d = new Date();
+      d.setDate(d.getDate() + BOOKING_MAX_DAYS_AHEAD);
+      return formatLocalDate(d);
+    }
+    // WebTrac/Arlington operating window: bookings 8am–9pm only.
+    // Latest valid start time depends on duration: a 60-min booking can start
+    // as late as 8:00pm (ends 9:00pm). A 90-min can start at 7:30pm.
+    const BOOKING_FIRST_HOUR = 8;   // 08:00 first slot
+    const BOOKING_CLOSE_HOUR = 21;  // 21:00 hard close
+    const BOOKING_HEADCOUNT = 2;
+
+    function lastBookingStartMins(durationMins) {
+      return BOOKING_CLOSE_HOUR * 60 - durationMins;
     }
 
-    // Fixed 8am start; with 26 blocks of 30 min, covers 8am–9pm.
-    const DEFAULT_BEGIN_TIME = '08:00 am';
-    const BLOCKS_TO_DISPLAY = '26';
+    function defaultBookingTime24() {
+      const date = bookingPrefs.date || defaultBookingDateISO();
+      const first = listBookingTimesForDate(bookingPrefs.duration, date)[0];
+      return first ? first.value : '08:00';
+    }
+
+    function listOperatingTimes(durationMins) {
+      const out = [];
+      const first = BOOKING_FIRST_HOUR * 60;
+      const last  = lastBookingStartMins(durationMins);
+      for (let mins = first; mins <= last; mins += 30) {
+        const h = Math.floor(mins / 60);
+        const m = mins % 60;
+        const v = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        const h12 = h % 12 === 0 ? 12 : h % 12;
+        out.push({ value: v, label: `${h12}:${String(m).padStart(2, '0')} ${ampm}` });
+      }
+      return out;
+    }
+
+    function listBookingTimesForDate(durationMins, dateISO) {
+      const minStart = minBookingStartDateTime();
+      return listOperatingTimes(durationMins).filter(t =>
+        dateFromISOAndTime(dateISO, t.value).getTime() >= minStart.getTime()
+      );
+    }
+
+    // Returns array of { value: 'HH:MM', label: '8:00 AM' } for every valid
+    // start time given the date and booking duration. This enforces both the
+    // 9pm close and Arlington's "at least 24 hours ahead" rule.
+    function listBookingTimes(durationMins, dateISO = bookingPrefs.date) {
+      return listBookingTimesForDate(durationMins, dateISO || defaultBookingDateISO());
+    }
+
+    // Format the booking range as "9:30 AM – 10:30 AM" for the live label
+    // below the picker so the user always sees exactly what they're booking.
+    function formatBookingRange() {
+      if (!bookingPrefs.time) return 'Pick a valid time';
+      const [h, m] = bookingPrefs.time.split(':').map(Number);
+      const startMins = h * 60 + m;
+      const endMins = startMins + bookingPrefs.duration;
+      const fmt = (mins) => {
+        const hr = Math.floor(mins / 60);
+        const mn = mins % 60;
+        const ampm = hr >= 12 ? 'PM' : 'AM';
+        const h12 = hr % 12 === 0 ? 12 : hr % 12;
+        return `${h12}:${String(mn).padStart(2, '0')} ${ampm}`;
+      };
+      return `${fmt(startMins)} – ${fmt(endMins)}`;
+    }
+    function initBookingPrefsIfNeeded() {
+      if (!bookingPrefs.date) bookingPrefs.date = defaultBookingDateISO();
+      if (!bookingPrefs.time) bookingPrefs.time = defaultBookingTime24();
+    }
+
+    function isoToWebtracDate(iso) {
+      const [y, m, d] = iso.split('-');
+      return `${m}/${d}/${y}`;
+    }
+    function time24toWebtracTime(t) {
+      const [h, m] = t.split(':').map(Number);
+      const ampm = h >= 12 ? 'pm' : 'am';
+      const h12 = h % 12 === 0 ? 12 : h % 12;
+      return `${String(h12).padStart(2, '0')}:${String(m).padStart(2, '0')} ${ampm}`;
+    }
+    function durationToBlocks(duration) {
+      return duration === 90 ? '6' : '4';
+    }
+
+    function bookingDate() {
+      initBookingPrefsIfNeeded();
+      return isoToWebtracDate(bookingPrefs.date);
+    }
+    // Manual fallback URL: always show WebTrac's full 8am-9pm grid. The selected
+    // time is not sent as the display begin time, which avoids the Quincy-style
+    // "auto-selected random slot" behavior from the earlier experiment.
+    const WEBTRAC_DISPLAY_BEGIN_TIME = '08:00 am';
+    const WEBTRAC_DISPLAY_BLOCKS     = '26';      // 8am to 9pm in 30-min blocks
+
+    function bookingBeginTime()       { return WEBTRAC_DISPLAY_BEGIN_TIME; }
+    function bookingBlocksToDisplay() { return WEBTRAC_DISPLAY_BLOCKS; }
+
+    // -------------------- Availability (live slot data via Netlify Function) --------------------
+    // GET /.netlify/functions/availability?court=…&date=MM/DD/YYYY&sport=…
+    // Returns aggregate slots plus per-court-unit slots, when WebTrac exposes them.
+    // Cached in-memory + sessionStorage, keyed by court|date|sport, for 60s.
+    const AVAILABILITY_TTL_MS = 60 * 1000;
+    const AVAILABILITY_PARSER_VERSION = 'unit-v2';
+    const availabilityMemCache = new Map();
+
+    function availabilityCacheGet(key) {
+      const mem = availabilityMemCache.get(key);
+      if (mem && Date.now() - mem.at < AVAILABILITY_TTL_MS) {
+        return mem.availability || normalizeAvailabilityPayload({ slots: mem.slots });
+      }
+      try {
+        const raw = sessionStorage.getItem('courtside_avail_' + key);
+        if (raw) {
+          const obj = JSON.parse(raw);
+          if (Date.now() - obj.at < AVAILABILITY_TTL_MS) {
+            availabilityMemCache.set(key, obj);
+            return obj.availability || normalizeAvailabilityPayload({ slots: obj.slots });
+          }
+        }
+      } catch (e) {}
+      return null;
+    }
+    function availabilityCacheSet(key, availability) {
+      const entry = { availability: normalizeAvailabilityPayload(availability), at: Date.now() };
+      availabilityMemCache.set(key, entry);
+      try { sessionStorage.setItem('courtside_avail_' + key, JSON.stringify(entry)); } catch (e) {}
+    }
+
+    function normalizeAvailabilityPayload(data) {
+      const aggregateSlots = Array.isArray(data)
+        ? data
+        : (Array.isArray(data && data.slots) ? data.slots : []);
+      const courts = Array.isArray(data && data.courts)
+        ? data.courts.map((unit, index) => ({
+            id: String(unit.id || `court-${index + 1}`),
+            label: String(unit.label || `Court ${index + 1}`),
+            webtracFacilityId: unit.webtracFacilityId || null,
+            slots: Array.isArray(unit.slots) ? unit.slots : [],
+          })).filter(unit => unit.slots.length)
+        : [];
+      return {
+        slots: aggregateSlots,
+        courts,
+        courtCount: Number(data && data.courtCount) || courts.length,
+        fetchedAt: data && data.fetchedAt || null,
+      };
+    }
+
+    async function fetchAvailability(courtCode, sportType) {
+      const dateMMDDYYYY = isoToWebtracDate(bookingPrefs.date);
+      const key = `${AVAILABILITY_PARSER_VERSION}|${courtCode}|${dateMMDDYYYY}|${sportType}`;
+      const cached = availabilityCacheGet(key);
+      if (cached) return cached;
+      const url = '/.netlify/functions/availability'
+        + `?court=${encodeURIComponent(courtCode)}`
+        + `&date=${encodeURIComponent(dateMMDDYYYY)}`
+        + `&sport=${encodeURIComponent(sportType)}`
+        + `&parser=${encodeURIComponent(AVAILABILITY_PARSER_VERSION)}`;
+      console.log('[availability] fetching', url);
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 15000);
+      try {
+        const res = await fetch(url, { signal: controller.signal });
+        clearTimeout(timer);
+        if (!res.ok) {
+          // Try to extract the function's error body for a better message.
+          let bodyText = '';
+          try { bodyText = await res.text(); } catch (e) {}
+          const err = new Error('HTTP ' + res.status);
+          err.status = res.status;
+          err.body = bodyText;
+          console.warn('[availability] non-OK response', res.status, bodyText);
+          throw err;
+        }
+        const data = await res.json();
+        const availability = normalizeAvailabilityPayload(data);
+        console.log('[availability] got', availability.slots.length, 'aggregate slots',
+                    `(${availability.slots.filter(s=>!s.available).length} taken)`,
+                    'court units:', availability.courts.length);
+        availabilityCacheSet(key, availability);
+        return availability;
+      } catch (e) {
+        clearTimeout(timer);
+        console.warn('[availability] failed:', e && e.message || e, e);
+        // Surface the error so refreshAvailability can show a specific message.
+        return { __error: true, status: e && e.status, message: e && e.message };
+      }
+    }
+
+    function bookingSlotKeys(startHHMM, durationMins) {
+      const [h, m] = startHHMM.split(':').map(Number);
+      const start = h * 60 + m;
+      const out = [];
+      for (let mins = start; mins < start + durationMins; mins += 30) {
+        const hr = Math.floor(mins / 60);
+        const mn = mins % 60;
+        out.push(`${String(hr).padStart(2, '0')}:${String(mn).padStart(2, '0')}`);
+      }
+      return out;
+    }
+
+    function slotRangeAvailable(slots, requireKnownSlots = true) {
+      if (!bookingPrefs.time) return false;
+      const lookup = new Map((slots || []).map(s => [s.start, s]));
+      return bookingSlotKeys(bookingPrefs.time, bookingPrefs.duration).every(key => {
+        const info = lookup.get(key);
+        if (!info) return !requireKnownSlots;
+        return info.available !== false;
+      });
+    }
+
+    function availabilitySummaryForSelectedRange(availability, court) {
+      if (availability && availability.__error) {
+        return {
+          tone: 'warn',
+          label: 'Check manually',
+          detail: `Live availability did not load for ${formatBookingRange()}.`,
+          rankBucket: 2,
+          openCount: 0,
+          totalCount: 0,
+          availabilityRatio: 0,
+        };
+      }
+
+      const normalized = normalizeAvailabilityPayload(availability || {});
+      if (normalized.courts.length) {
+        const openUnits = normalized.courts.filter(unit => slotRangeAvailable(unit.slots, true));
+        if (openUnits.length) {
+          const unitNames = openUnits
+            .slice(0, 2)
+            .map(unit => friendlyCourtUnitLabel(unit.label, court && court.name))
+            .join(', ');
+          const more = openUnits.length > 2 ? ` +${openUnits.length - 2} more` : '';
+          return {
+            tone: 'open',
+            label: `${openUnits.length}/${normalized.courts.length} open`,
+            detail: `${unitNames}${more} at ${formatBookingRange()}`,
+            rankBucket: 0,
+            openCount: openUnits.length,
+            totalCount: normalized.courts.length,
+            availabilityRatio: openUnits.length / normalized.courts.length,
+          };
+        }
+        return {
+          tone: 'full',
+          label: 'Full',
+          detail: `No courts open at ${formatBookingRange()}`,
+          rankBucket: 3,
+          openCount: 0,
+          totalCount: normalized.courts.length,
+          availabilityRatio: 0,
+        };
+      }
+
+      if (normalized.slots.length) {
+        const open = slotRangeAvailable(normalized.slots, true);
+        return {
+          tone: open ? 'open' : 'full',
+          label: open ? 'Open' : 'Full',
+          detail: open
+            ? `Available at ${formatBookingRange()}`
+            : `Unavailable at ${formatBookingRange()}`,
+          rankBucket: open ? 0 : 3,
+          openCount: open ? 1 : 0,
+          totalCount: 1,
+          availabilityRatio: open ? 1 : 0,
+        };
+      }
+
+      return {
+        tone: 'warn',
+        label: 'Manual check',
+        detail: `No detailed availability came back for ${formatBookingRange()}.`,
+        rankBucket: 2,
+        openCount: 0,
+        totalCount: 0,
+        availabilityRatio: 0,
+      };
+    }
+
+    // Apply availability data to the live #prefTime <select>. Disabled options
+    // now account for the whole booking duration: a 60-minute booking needs two
+    // consecutive 30-minute blocks, and a 90-minute booking needs three.
+    // Available options keep WebTrac's AJAX URL as metadata for the future
+    // server-side booking adapter, never as a browser navigation target.
+    function applyAvailabilityToTimeSelect(slots, statusEl, options = {}) {
+      const select = document.getElementById('prefTime');
+      if (!select) return;
+      const requireKnownSlots = Boolean(options.requireKnownSlots);
+      const lookup = new Map((slots || []).map(s => [s.start, s]));
+      Array.from(select.options).forEach(opt => {
+        const baseLabel = opt.dataset.baseLabel || opt.text.replace(/ — Unavailable$/, '');
+        opt.dataset.baseLabel = baseLabel;
+        const slotKeys = bookingSlotKeys(opt.value, bookingPrefs.duration);
+        const blocked = slotKeys.some(key => {
+          const info = lookup.get(key);
+          if (!info) return requireKnownSlots;
+          return info.available === false;
+        });
+        const bookingUrls = slotKeys
+          .map(key => lookup.get(key) && lookup.get(key).bookingUrl)
+          .filter(Boolean);
+        if (blocked) {
+          opt.disabled = true;
+          opt.text = baseLabel + ' — Unavailable';
+          delete opt.dataset.bookingUrl;
+          delete opt.dataset.bookingUrls;
+        } else {
+          opt.disabled = false;
+          opt.text = baseLabel;
+          if (bookingUrls.length) {
+            opt.dataset.bookingUrl = bookingUrls[0];
+            opt.dataset.bookingUrls = JSON.stringify(bookingUrls);
+          } else {
+            delete opt.dataset.bookingUrl;
+            delete opt.dataset.bookingUrls;
+          }
+        }
+      });
+      if (select.options[select.selectedIndex] && select.options[select.selectedIndex].disabled) {
+        const next = Array.from(select.options).find(o => !o.disabled);
+        if (next) {
+          select.value = next.value;
+          bookingPrefs.time = next.value;
+        }
+      }
+      if (statusEl) statusEl.textContent = '';
+    }
+
+    function clearAvailabilityFromTimeSelect() {
+      const select = document.getElementById('prefTime');
+      if (!select) return;
+      Array.from(select.options).forEach(opt => {
+        opt.disabled = false;
+        if (opt.dataset.baseLabel) opt.text = opt.dataset.baseLabel;
+        delete opt.dataset.bookingUrl;
+        delete opt.dataset.bookingUrls;
+      });
+    }
+
+    // Look up WebTrac's live AJAX URL for the selected 30-minute start block.
+    // v3 sends this only to our backend adapter; navigating to it directly is
+    // the known broken path that produces a raw {"status":"invalid"} page.
+    function selectedSlotBookingUrl() {
+      const select = document.getElementById('prefTime');
+      if (!select) return null;
+      const opt = select.options[select.selectedIndex];
+      return opt && opt.dataset.bookingUrl ? opt.dataset.bookingUrl : null;
+    }
+
+    function selectedSlotBookingUrls() {
+      const select = document.getElementById('prefTime');
+      if (!select) return [];
+      const opt = select.options[select.selectedIndex];
+      if (!opt) return [];
+      if (opt.dataset.bookingUrls) {
+        try {
+          const urls = JSON.parse(opt.dataset.bookingUrls);
+          return Array.isArray(urls) ? urls.filter(Boolean) : [];
+        } catch (e) {}
+      }
+      return opt.dataset.bookingUrl ? [opt.dataset.bookingUrl] : [];
+    }
+
+    function selectedCourtUnitKey(court) {
+      return `${selectedSport}|${court && court.id || 'court'}|${bookingPrefs.date || ''}`;
+    }
+
+    function availabilityStartValuesForSlots(slots, requireKnownSlots = false) {
+      const lookup = new Map((slots || []).map(s => [s.start, s]));
+      return listBookingTimes(bookingPrefs.duration).filter(t =>
+        bookingSlotKeys(t.value, bookingPrefs.duration).every(key => {
+          const info = lookup.get(key);
+          if (!info) return !requireKnownSlots;
+          return !info || info.available !== false;
+        })
+      ).map(t => t.value);
+    }
+
+    function courtUnitHasAvailability(unit) {
+      return availabilityStartValuesForSlots(unit && unit.slots || [], true).length > 0;
+    }
+
+    function selectedCourtUnitFor(court, availability) {
+      const units = Array.isArray(availability && availability.courts) ? availability.courts : [];
+      if (!units.length) return null;
+      const key = selectedCourtUnitKey(court);
+      const savedId = selectedCourtUnits.get(key);
+      let unit = units.find(u => u.id === savedId);
+      if (!unit) unit = units.find(courtUnitHasAvailability) || units[0];
+      selectedCourtUnits.set(key, unit.id);
+      return unit;
+    }
+
+    function selectedCourtUnitSlots(court, availability) {
+      const unit = selectedCourtUnitFor(court, availability);
+      return unit ? unit.slots : (availability && availability.slots || []);
+    }
+
+    function selectedCourtUnitPayload(court) {
+      const picker = document.getElementById('courtUnitGrid');
+      const active = picker && picker.querySelector('.court-unit-btn.active');
+      if (!active) return null;
+      return {
+        id: active.dataset.courtUnitId || null,
+        label: active.dataset.courtUnitLabel || active.textContent.trim(),
+        displayLabel: active.dataset.courtUnitDisplay || active.textContent.trim(),
+        webtracFacilityId: active.dataset.webtracFacilityId || null,
+      };
+    }
+
+    function friendlyCourtUnitLabel(label, facilityName) {
+      let raw = String(label || '').replace(/\s+/g, ' ').trim();
+      if (!raw) return 'Court';
+      const facility = String(facilityName || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      if (facility) raw = raw.replace(new RegExp(facility, 'ig'), '').trim();
+      raw = raw
+        .replace(/\bFacility Reservation\b/ig, '')
+        .replace(/\bTennis\b/ig, '')
+        .replace(/\bPickleball\b/ig, '')
+        .replace(/\bVolleyball\b/ig, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+      const courtNumber = raw.match(/\b(?:court|ct)\s*#?\s*([0-9]+[A-Z]?)\b/i)
+        || raw.match(/#\s*([0-9]+[A-Z]?)\b/i)
+        || raw.match(/\b([0-9]+[A-Z]?)\b$/i);
+      return courtNumber ? `Court ${courtNumber[1]}` : (raw || String(label).trim() || 'Court');
+    }
+
+    function availabilitySummaryForUnit(unit) {
+      const starts = availabilityStartValuesForSlots(unit && unit.slots || [], true);
+      if (!starts.length) return 'Full';
+      const first = listOperatingTimes(bookingPrefs.duration).find(t => t.value === starts[0]);
+      const count = starts.length;
+      return `${count} open${first ? ` · first ${first.label}` : ''}`;
+    }
+
+    function renderCourtUnitSelector(court, availability, statusEl, onChange) {
+      const wrap = document.getElementById('courtUnitPicker');
+      const grid = document.getElementById('courtUnitGrid');
+      if (!wrap || !grid) return;
+      const units = Array.isArray(availability && availability.courts) ? availability.courts : [];
+      if (units.length <= 1) {
+        wrap.hidden = true;
+        grid.innerHTML = '';
+        return;
+      }
+
+      wrap.hidden = false;
+      const selectedUnit = selectedCourtUnitFor(court, availability);
+      grid.innerHTML = units.map((unit) => {
+        const active = selectedUnit && unit.id === selectedUnit.id;
+        const display = friendlyCourtUnitLabel(unit.label, court && court.name);
+        return `
+          <button type="button"
+                  class="court-unit-btn${active ? ' active' : ''}"
+                  data-court-unit-id="${escapeHtml(unit.id)}"
+                  data-court-unit-label="${escapeHtml(unit.label)}"
+                  data-court-unit-display="${escapeHtml(display)}"
+                  data-webtrac-facility-id="${escapeHtml(unit.webtracFacilityId || '')}"
+                  aria-pressed="${active}">
+            <span class="court-unit-name">${escapeHtml(display)}</span>
+            <span class="court-unit-meta">${escapeHtml(availabilitySummaryForUnit(unit))}</span>
+          </button>`;
+      }).join('');
+
+      grid.querySelectorAll('.court-unit-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          selectedCourtUnits.set(selectedCourtUnitKey(court), btn.dataset.courtUnitId);
+          grid.querySelectorAll('.court-unit-btn').forEach(other => {
+            const active = other === btn;
+            other.classList.toggle('active', active);
+            other.setAttribute('aria-pressed', String(active));
+          });
+          const unit = units.find(u => u.id === btn.dataset.courtUnitId);
+          applyAvailabilityToTimeSelect(
+            unit ? unit.slots : availability.slots,
+            statusEl,
+            { requireKnownSlots: Boolean(unit) }
+          );
+          if (onChange) onChange();
+        });
+      });
+    }
+
+    function escapeHtml(value) {
+      return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    async function refreshAvailability(court, statusEl, onUnitChange) {
+      if (!court || !court.code || court.code === 'TBD') return;
+      const sportType = SPORTS[selectedSport].type;
+      const reserveBtn = document.getElementById('reserveBtn');
+      if (reserveBtn && !reserveBtn.hidden) {
+        reserveBtn.disabled = true;
+        reserveBtn.textContent = 'Checking courts...';
+      }
+      if (statusEl) statusEl.textContent = 'Checking availability…';
+      const result = await fetchAvailability(court.code, sportType);
+      if (result && result.__error) {
+        // Specific error message so you know WHY it failed in DevTools.
+        clearAvailabilityFromTimeSelect();
+        if (reserveBtn && !reserveBtn.hidden) {
+          reserveBtn.disabled = false;
+          reserveBtn.textContent = 'Continue to WebTrac';
+        }
+        if (statusEl) {
+          const hint = result.status === 404 ? 'function not deployed'
+                     : result.status === 500 ? 'env var likely missing'
+                     : result.status === 502 ? 'scraper rejected'
+                     : 'check console';
+          statusEl.textContent = `Couldn't load availability (${result.status || 'network'}) — ${hint}`;
+        }
+        return;
+      }
+      const availability = normalizeAvailabilityPayload(result);
+      renderCourtUnitSelector(court, availability, statusEl, onUnitChange);
+      const beforeTime = bookingPrefs.time;
+      applyAvailabilityToTimeSelect(
+        selectedCourtUnitSlots(court, availability),
+        statusEl,
+        { requireKnownSlots: availability.courts.length > 1 }
+      );
+      if (bookingPrefs.time !== beforeTime && onUnitChange) onUnitChange();
+      if (reserveBtn && !reserveBtn.hidden) {
+        reserveBtn.disabled = false;
+        reserveBtn.textContent = 'Continue to WebTrac';
+      }
+      if (statusEl && availability.courts.length > 1) {
+        const unit = selectedCourtUnitFor(court, availability);
+        statusEl.textContent = `Showing availability for ${friendlyCourtUnitLabel(unit.label, court.name)}.`;
+      }
+    }
 
     function webtracUrl(code) {
       const u = new URL('https://vaarlingtonweb.myvscloud.com/webtrac/web/search.html');
@@ -1058,9 +2179,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       u.searchParams.set('location', code);
       u.searchParams.set('primarycode', '');
       u.searchParams.set('date', bookingDate());
-      u.searchParams.set('begintime', DEFAULT_BEGIN_TIME);
-      u.searchParams.set('frheadcount', '0');
-      u.searchParams.set('blockstodisplay', BLOCKS_TO_DISPLAY);
+      u.searchParams.set('begintime', bookingBeginTime());
+      u.searchParams.set('frheadcount', String(BOOKING_HEADCOUNT));
+      u.searchParams.set('blockstodisplay', bookingBlocksToDisplay());
       u.searchParams.set('display', 'Detail');
       u.searchParams.set('search', 'yes');
       u.searchParams.set('page', '1');
@@ -1074,12 +2195,856 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       u.searchParams.set('Action', 'Start');
       u.searchParams.set('type', SPORTS[selectedSport].type);
       u.searchParams.set('date', bookingDate());
-      u.searchParams.set('begintime', DEFAULT_BEGIN_TIME);
-      u.searchParams.set('blockstodisplay', BLOCKS_TO_DISPLAY);
+      u.searchParams.set('begintime', bookingBeginTime());
+      u.searchParams.set('blockstodisplay', bookingBlocksToDisplay());
       u.searchParams.set('display', 'Detail');
       u.searchParams.set('module', 'FR');
       u.searchParams.set('search', 'yes');
       return u.toString();
+    }
+
+    function bookingEndTime24() {
+      const [h, m] = bookingPrefs.time.split(':').map(Number);
+      const end = h * 60 + m + bookingPrefs.duration;
+      const endH = Math.floor(end / 60);
+      const endM = end % 60;
+      return `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+    }
+
+    function buildBookingPayload(court) {
+      const courtUnit = selectedCourtUnitPayload(court);
+      return {
+        courtId: court.id,
+        courtCode: court.code,
+        courtName: court.name,
+        courtUnitId: courtUnit && courtUnit.id,
+        courtUnitName: courtUnit && courtUnit.label,
+        courtUnitDisplayName: courtUnit && courtUnit.displayLabel,
+        webtracFacilityId: courtUnit && courtUnit.webtracFacilityId,
+        sport: selectedSport,
+        sportType: SPORTS[selectedSport].type,
+        date: bookingPrefs.date,
+        dateWebtrac: bookingDate(),
+        start: bookingPrefs.time,
+        end: bookingEndTime24(),
+        duration: bookingPrefs.duration,
+        headcount: BOOKING_HEADCOUNT,
+        rangeLabel: formatBookingRange(),
+        webtracSearchUrl: webtracUrl(court.code),
+        webtracUpdateSelectionUrl: selectedSlotBookingUrl(),
+        webtracUpdateSelectionUrls: selectedSlotBookingUrls(),
+      };
+    }
+
+    function setReserveStatus(el, message, tone) {
+      if (!el) return;
+      el.hidden = false;
+      el.classList.toggle('ok', tone === 'ok');
+      el.classList.toggle('warn', tone === 'warn');
+      el.textContent = message;
+    }
+
+    const BOOKING_PROGRESS_MESSAGES = [
+      'Checking live availability with Arlington WebTrac...',
+      'Courtside keeps you here, but the reservation is made through Arlington County Parks & Recreation.',
+      'If the court is booked, Arlington/WebTrac should send the official confirmation details.',
+      'Cancellation, adjustment, refund, and facility-use requests go through Arlington DPR/Facilities Scheduling.',
+      'Arlington rental policy generally requires cancellation or adjustment requests at least 72 hours before use.',
+      'Checkout and payment stay paused until you explicitly confirm.'
+    ];
+
+    function startBookingProgressMessages(el) {
+      if (!el) return { stop() {} };
+
+      let index = 0;
+      let timer = null;
+      const showNext = () => {
+        setReserveStatus(el, BOOKING_PROGRESS_MESSAGES[index], '');
+        index = Math.min(index + 1, BOOKING_PROGRESS_MESSAGES.length - 1);
+        timer = window.setTimeout(showNext, 2600);
+      };
+
+      showNext();
+      return {
+        stop() {
+          if (timer) window.clearTimeout(timer);
+        }
+      };
+    }
+
+    function showBookingAgreement(court) {
+      return new Promise((resolve) => {
+        const existing = document.getElementById('bookingAgreement');
+        if (existing) existing.remove();
+
+        const courtUnit = selectedCourtUnitPayload(court);
+        const courtLabel = [
+          court?.name,
+          courtUnit?.displayLabel || courtUnit?.label,
+          bookingPrefs.date,
+          formatBookingRange(),
+        ].filter(Boolean).join(' · ');
+
+        const backdrop = document.createElement('div');
+        backdrop.className = 'agreement-backdrop';
+        backdrop.id = 'bookingAgreement';
+        backdrop.setAttribute('role', 'dialog');
+        backdrop.setAttribute('aria-modal', 'true');
+        backdrop.setAttribute('aria-labelledby', 'bookingAgreementTitle');
+        backdrop.innerHTML = `
+          <div class="agreement-sheet">
+            <p class="agreement-kicker">Arlington/WebTrac agreement</p>
+            <h2 class="agreement-title" id="bookingAgreementTitle">Tennis and Pickleball Agreements</h2>
+            <p class="agreement-summary">
+              Arlington WebTrac requires the Tennis and Pickleball Agreements before this court can be added to cart. Courtside will send you to WebTrac for:
+              <strong>${escapeHtml(courtLabel)}</strong>
+            </p>
+            <ul class="agreement-list">
+              <li>I accept Arlington's Tennis and Pickleball Agreements for this reservation request.</li>
+              <li>I understand Courtside will open Arlington WebTrac with this court and date prefilled where WebTrac supports it; I will choose the matching time block on WebTrac.</li>
+              <li>I understand final selection, checkout, payment, cancellation, and refund handling happen through Arlington County Parks & Recreation/WebTrac.</li>
+            </ul>
+            <label class="agreement-check">
+              <input type="checkbox" id="bookingAgreementCheck">
+              <span>I accept the Arlington Tennis and Pickleball Agreements and want to continue to Arlington WebTrac.</span>
+            </label>
+            <div class="agreement-actions">
+              <button class="btn btn-ghost" type="button" id="bookingAgreementCancel">Cancel</button>
+              <button class="btn btn-primary" type="button" id="bookingAgreementAccept" disabled>Agree and continue</button>
+            </div>
+          </div>
+        `;
+
+        const finish = (accepted) => {
+          backdrop.remove();
+          document.removeEventListener('keydown', onKeydown);
+          resolve(accepted);
+        };
+        const onKeydown = (event) => {
+          if (event.key === 'Escape') finish(false);
+        };
+
+        document.body.appendChild(backdrop);
+        const check = backdrop.querySelector('#bookingAgreementCheck');
+        const accept = backdrop.querySelector('#bookingAgreementAccept');
+        const cancel = backdrop.querySelector('#bookingAgreementCancel');
+        check?.focus();
+        check?.addEventListener('change', () => {
+          if (accept) accept.disabled = !check.checked;
+        });
+        accept?.addEventListener('click', () => finish(Boolean(check?.checked)));
+        cancel?.addEventListener('click', () => finish(false));
+        backdrop.addEventListener('click', (event) => {
+          if (event.target === backdrop) finish(false);
+        });
+        document.addEventListener('keydown', onKeydown);
+      });
+    }
+
+    let stripeScriptPromise = null;
+    let activeStripePayment = null;
+    let activeSupportPayment = null;
+
+    function formatUsd(cents) {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+      }).format((Number(cents) || 0) / 100);
+    }
+
+    function parseUsdToCents(value) {
+      if (typeof value !== 'string') return null;
+      const amount = Number(value.replace(/[^0-9.]/g, ''));
+      return Number.isFinite(amount) ? Math.round(amount * 100) : null;
+    }
+
+    function cartAmountCents(data) {
+      const cart = data && data.cartState || {};
+      if (Number.isInteger(cart.amountTodayCents)) return cart.amountTodayCents;
+      return parseUsdToCents(cart.amountToday || cart.grandTotal);
+    }
+
+    function loadStripeScript() {
+      if (window.Stripe) return Promise.resolve();
+      if (stripeScriptPromise) return stripeScriptPromise;
+      stripeScriptPromise = new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://js.stripe.com/v3/';
+        script.async = true;
+        script.onload = resolve;
+        script.onerror = () => reject(new Error('Stripe.js could not load.'));
+        document.head.appendChild(script);
+      });
+      return stripeScriptPromise;
+    }
+
+    function setPaymentStatus(el, message, tone) {
+      if (!el) return;
+      el.textContent = message || '';
+      el.classList.toggle('ok', tone === 'ok');
+      el.classList.toggle('warn', tone === 'warn');
+    }
+
+    async function prepareStripePayment(panelEl, bookingResult, bookingPayload) {
+      if (!panelEl || bookingResult.status !== 'cart_updated') return;
+      const amountCents = cartAmountCents(bookingResult);
+      const amountEl = panelEl.querySelector('#paymentAmount');
+      const elementEl = panelEl.querySelector('#paymentElement');
+      const payBtn = panelEl.querySelector('#payBtn');
+      const paymentStatusEl = panelEl.querySelector('#paymentStatus');
+
+      panelEl.hidden = false;
+      if (amountEl) amountEl.textContent = amountCents ? formatUsd(amountCents) : '$--';
+      if (elementEl) elementEl.innerHTML = '';
+      if (payBtn) {
+        payBtn.disabled = true;
+        payBtn.textContent = 'Confirm booking / pay';
+      }
+      setPaymentStatus(paymentStatusEl, 'Preparing secure payment...', '');
+
+      if (!amountCents) {
+        setPaymentStatus(paymentStatusEl, 'No payment amount was found in the WebTrac cart response.', 'warn');
+        return;
+      }
+
+      try {
+        const [configRes] = await Promise.all([
+          fetch('/.netlify/functions/stripe-config', { headers: { 'Cache-Control': 'no-store' } }),
+          loadStripeScript(),
+        ]);
+        const config = await configRes.json().catch(() => ({}));
+        if (!configRes.ok || !config.publishableKey) {
+          setPaymentStatus(paymentStatusEl, config.message || 'Stripe test mode is not configured yet.', 'warn');
+          return;
+        }
+
+        setPaymentStatus(paymentStatusEl, 'Checking Arlington/WebTrac checkout...', '');
+        const preflight = await preflightWebtracCheckout(bookingPayload);
+        if (!preflight.ready) {
+          setPaymentStatus(paymentStatusEl, preflight.message || 'Arlington/WebTrac checkout is not ready yet.', 'warn');
+          return;
+        }
+        if (preflight.webtrac?.allowWebtracFinalPayment !== true) {
+          setPaymentStatus(
+            paymentStatusEl,
+            'Arlington/WebTrac checkout is ready, but final WebTrac payment is still disabled. No card authorization was created.',
+            'warn'
+          );
+          return;
+        }
+
+        setPaymentStatus(paymentStatusEl, 'Preparing secure payment...', '');
+        const intentRes = await fetch('/.netlify/functions/create-payment-intent', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            amountCents,
+            captureMethod: 'manual',
+            booking: {
+              courtName: bookingPayload.courtName,
+              courtCode: bookingPayload.courtCode,
+              courtUnitName: bookingPayload.courtUnitName,
+              courtUnitDisplayName: bookingPayload.courtUnitDisplayName,
+              date: bookingPayload.date,
+              start: bookingPayload.start,
+              end: bookingPayload.end,
+              duration: bookingPayload.duration,
+            },
+          }),
+        });
+        const intent = await intentRes.json().catch(() => ({}));
+        if (!intentRes.ok || !intent.clientSecret) {
+          setPaymentStatus(paymentStatusEl, intent.message || 'Could not create a Stripe test payment.', 'warn');
+          return;
+        }
+
+        const stripe = window.Stripe(config.publishableKey);
+        const elements = stripe.elements({ clientSecret: intent.clientSecret });
+        const paymentElement = elements.create('payment', {
+          layout: { type: 'accordion', defaultCollapsed: false },
+        });
+        paymentElement.mount(elementEl);
+        activeStripePayment = { stripe, elements, amountCents, bookingPayload };
+
+        if (payBtn) {
+          payBtn.disabled = false;
+          payBtn.onclick = () => confirmStripePayment(payBtn, paymentStatusEl);
+        }
+        setPaymentStatus(
+          paymentStatusEl,
+          config.mode === 'live'
+            ? 'Live payment is ready. Your card is authorized first, then captured only after Arlington/WebTrac confirms.'
+            : 'Secure payment is ready. Your card is authorized first, then captured only after Arlington/WebTrac confirms.',
+          ''
+        );
+      } catch (e) {
+        setPaymentStatus(paymentStatusEl, e.message || 'Could not prepare payment.', 'warn');
+      }
+    }
+
+    async function preflightWebtracCheckout(bookingPayload) {
+      const localWorker = localBookingWorkerConfig();
+      if (localWorker?.url) {
+        return preflightWithLocalWorker(bookingPayload, localWorker);
+      }
+
+      try {
+        const res = await fetch('/.netlify/functions/checkout-preflight', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ booking: bookingPayload }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.status === 202 && data.jobId) {
+          return pollCheckoutPreflightStatus(data.jobId, data.pollAfterMs);
+        }
+        return normalizePreflightResult(res.ok, data);
+      } catch (e) {
+        return {
+          ready: false,
+          code: 'WEBTRAC_PREFLIGHT_UNREACHABLE',
+          message: 'Final booking service is not reachable. No card authorization was created.',
+        };
+      }
+    }
+
+    async function pollCheckoutPreflightStatus(jobId, pollAfterMs) {
+      let waitMs = Math.max(1000, Number(pollAfterMs) || 2000);
+      for (let attempt = 0; attempt < 90; attempt += 1) {
+        await new Promise(resolve => setTimeout(resolve, waitMs));
+        const res = await fetch(`/.netlify/functions/checkout-preflight-status?jobId=${encodeURIComponent(jobId)}`, {
+          headers: { 'Cache-Control': 'no-store' },
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.status !== 202) return normalizePreflightResult(res.ok, data);
+        waitMs = Math.max(1000, Number(data.pollAfterMs) || waitMs);
+      }
+      return {
+        ready: false,
+        code: 'WEBTRAC_PREFLIGHT_TIMEOUT',
+        message: 'Arlington/WebTrac checkout is still running. No card authorization was created.',
+      };
+    }
+
+    function normalizePreflightResult(ok, data) {
+      const ready = ok && data.status === 'ready';
+      const guardOff = ready && data.webtrac?.allowWebtracFinalPayment !== true;
+      return {
+        ready,
+        code: data.code,
+        message: guardOff
+          ? 'Arlington/WebTrac checkout is ready, but final WebTrac payment is still disabled. No card authorization was created.'
+          : data.message,
+        webtrac: data.webtrac,
+      };
+    }
+
+    async function preflightWithLocalWorker(bookingPayload, localWorker) {
+      const finalizeUrl = localWorkerFinalizeUrl(localWorker.url);
+      const headers = { 'Content-Type': 'application/json' };
+      if (localWorker.token) headers.Authorization = `Bearer ${localWorker.token}`;
+
+      try {
+        const res = await fetch(finalizeUrl, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ booking: bookingPayload, stopBeforeSubmit: true }),
+        });
+        const webtrac = await res.json().catch(() => ({}));
+        webtrac.httpStatus = res.status;
+        return {
+          ready: res.ok && webtrac.status === 'webtrac_payment_ready',
+          code: webtrac.code,
+          message: webtrac.message,
+          webtrac,
+        };
+      } catch (e) {
+        return {
+          ready: false,
+          code: 'WEBTRAC_PREFLIGHT_UNREACHABLE',
+          message: e.message || 'Local final booking service is not reachable.',
+        };
+      }
+    }
+
+    async function confirmStripePayment(payBtn, paymentStatusEl) {
+      if (!activeStripePayment) return;
+      payBtn.disabled = true;
+      payBtn.textContent = 'Confirming...';
+      setPaymentStatus(paymentStatusEl, 'Opening secure payment...', '');
+
+      const { stripe, elements, amountCents, bookingPayload } = activeStripePayment;
+      const { error, paymentIntent } = await stripe.confirmPayment({
+        elements,
+        confirmParams: { return_url: location.href },
+        redirect: 'if_required',
+      });
+
+      if (error) {
+        payBtn.disabled = false;
+        payBtn.textContent = 'Confirm booking / pay';
+        setPaymentStatus(paymentStatusEl, error.message || 'Payment was not completed.', 'warn');
+        return;
+      }
+
+      if (!paymentIntent?.id || paymentIntent.status !== 'requires_capture') {
+        payBtn.disabled = false;
+        payBtn.textContent = 'Confirm booking / pay';
+        setPaymentStatus(paymentStatusEl, `Stripe returned ${paymentIntent?.status || 'an unknown status'} instead of an authorization. No WebTrac checkout was attempted.`, 'warn');
+        return;
+      }
+
+      payBtn.textContent = 'Finishing...';
+      setPaymentStatus(paymentStatusEl, `Payment authorized for ${formatUsd(amountCents)}. Completing Arlington/WebTrac checkout...`, '');
+
+      const result = await finalizeAuthorizedBooking(paymentIntent.id, bookingPayload);
+      if (result.ok) {
+        activeStripePayment = null;
+        payBtn.disabled = true;
+        payBtn.textContent = 'Booked';
+        setPaymentStatus(paymentStatusEl, result.message || 'Court booked through Arlington/WebTrac. Payment captured.', 'ok');
+        track('booking_payment_captured', { amountCents });
+        return;
+      }
+
+      payBtn.disabled = result.retryable === false;
+      payBtn.textContent = result.retryable === false ? 'Review manually' : 'Try again';
+      setPaymentStatus(paymentStatusEl, result.message || 'WebTrac did not confirm the booking. Stripe authorization was released.', 'warn');
+      track('booking_payment_released', { amountCents, code: result.code || null });
+    }
+
+    async function finalizeAuthorizedBooking(paymentIntentId, bookingPayload) {
+      const localWorker = localBookingWorkerConfig();
+      if (localWorker?.url) {
+        return finalizeWithLocalWorker(paymentIntentId, bookingPayload, localWorker);
+      }
+
+      try {
+        const res = await fetch('/.netlify/functions/finalize-booking', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ paymentIntentId, booking: bookingPayload }),
+        });
+        const data = await res.json().catch(() => ({}));
+        return {
+          ok: res.ok && data.status === 'confirmed',
+          retryable: data.status !== 'payment_capture_failed',
+          code: data.code,
+          message: data.message || (res.ok ? 'Court booked through Arlington/WebTrac. Payment captured.' : 'WebTrac did not confirm the booking. Stripe authorization was released.'),
+          webtrac: data.webtrac,
+          payment: data.payment,
+        };
+      } catch (e) {
+        const release = await settleStripePayment('cancel', paymentIntentId, 'finalize_unreachable');
+        return {
+          ok: false,
+          retryable: true,
+          code: 'FINALIZE_SERVICE_UNREACHABLE',
+          message: release.ok
+            ? 'Final booking service is not reachable. Stripe authorization was released.'
+            : 'Final booking service is not reachable, and Stripe authorization could not be released automatically. Review this payment in Stripe.',
+          payment: release.data,
+        };
+      }
+    }
+
+    async function finalizeWithLocalWorker(paymentIntentId, bookingPayload, localWorker) {
+      const finalizeUrl = localWorkerFinalizeUrl(localWorker.url);
+      const headers = { 'Content-Type': 'application/json' };
+      if (localWorker.token) headers.Authorization = `Bearer ${localWorker.token}`;
+
+      let webtrac;
+      try {
+        const res = await fetch(finalizeUrl, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ booking: bookingPayload }),
+        });
+        webtrac = await res.json().catch(() => ({}));
+        webtrac.httpStatus = res.status;
+      } catch (e) {
+        webtrac = {
+          status: 'adapter_unreachable',
+          code: 'WEBTRAC_FINALIZE_ADAPTER_UNREACHABLE',
+          message: e.message || 'Local WebTrac worker is not reachable.',
+        };
+      }
+
+      if (webtrac.status === 'webtrac_confirmed') {
+        const capture = await settleStripePayment('capture', paymentIntentId);
+        if (capture.ok) {
+          return {
+            ok: true,
+            message: 'Court booked through Arlington/WebTrac. Payment captured.',
+            webtrac,
+            payment: capture.data,
+          };
+        }
+        return {
+          ok: false,
+          retryable: false,
+          code: capture.data?.code || 'STRIPE_CAPTURE_ERROR',
+          message: 'WebTrac appears confirmed, but Stripe capture failed. Review this booking manually.',
+          webtrac,
+          payment: capture.data,
+        };
+      }
+
+      const release = await settleStripePayment('cancel', paymentIntentId, webtrac.code || 'webtrac_not_confirmed');
+      return {
+        ok: false,
+        retryable: release.ok,
+        code: webtrac.code || 'WEBTRAC_NOT_CONFIRMED',
+        message: release.ok
+          ? `${webtrac.message || 'WebTrac did not confirm the booking.'} Stripe authorization was released.`
+          : `${webtrac.message || 'WebTrac did not confirm the booking.'} Stripe authorization could not be released automatically. Review this payment in Stripe.`,
+        webtrac,
+        payment: release.data,
+      };
+    }
+
+    function localWorkerFinalizeUrl(reserveUrl) {
+      const url = new URL(reserveUrl);
+      url.pathname = url.pathname.replace(/\/reserve\/?$/, '/checkout/finalize');
+      if (!/\/checkout\/finalize\/?$/.test(url.pathname)) {
+        url.pathname = `${url.pathname.replace(/\/$/, '')}/checkout/finalize`;
+      }
+      return url.toString();
+    }
+
+    async function settleStripePayment(action, paymentIntentId, reason) {
+      const endpoint = action === 'capture'
+        ? '/.netlify/functions/capture-payment-intent'
+        : '/.netlify/functions/cancel-payment-intent';
+      try {
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ paymentIntentId, reason }),
+        });
+        const data = await res.json().catch(() => ({}));
+        return { ok: res.ok, status: res.status, data };
+      } catch (e) {
+        return {
+          ok: false,
+          status: 0,
+          data: {
+            status: 'network_error',
+            code: action === 'capture' ? 'CAPTURE_SERVICE_UNREACHABLE' : 'CANCEL_SERVICE_UNREACHABLE',
+            message: e.message || 'Stripe settlement service is not reachable.',
+          },
+        };
+      }
+    }
+
+    function supportAmountCents() {
+      const customEl = document.getElementById('supportCustomAmount');
+      const activePreset = document.querySelector('.support-amount.active');
+      const hasCustomValue = Boolean(customEl && customEl.value.trim());
+      const customValue = Number(customEl?.value || 0);
+      if (hasCustomValue && Number.isFinite(customValue)) {
+        return Math.round(customValue * 100);
+      }
+      return Number(activePreset?.dataset.amount || 500);
+    }
+
+    function updateSupportAmountLabel() {
+      const amountCents = supportAmountCents();
+      const startBtn = document.getElementById('supportStartBtn');
+      const payBtn = document.getElementById('supportPayBtn');
+      if (startBtn) startBtn.textContent = `Continue with ${formatUsd(amountCents)}`;
+      if (payBtn) payBtn.textContent = `Pay ${formatUsd(amountCents)}`;
+      return amountCents;
+    }
+
+    async function prepareSupportPayment(amountCents) {
+      const panelEl = document.getElementById('supportPaymentPanel');
+      const elementEl = document.getElementById('supportPaymentElement');
+      const statusEl = document.getElementById('supportPaymentStatus');
+      const payBtn = document.getElementById('supportPayBtn');
+      const startBtn = document.getElementById('supportStartBtn');
+      if (!panelEl || !elementEl || !payBtn) return;
+
+      panelEl.hidden = false;
+      elementEl.innerHTML = '';
+      elementEl.hidden = true;
+      activeSupportPayment = null;
+      payBtn.disabled = true;
+      payBtn.hidden = true;
+      if (startBtn) startBtn.disabled = true;
+      setPaymentStatus(statusEl, 'Preparing secure payment...', '');
+
+      try {
+        const [configRes] = await Promise.all([
+          fetch('/.netlify/functions/stripe-config', { headers: { 'Cache-Control': 'no-store' } }),
+          loadStripeScript(),
+        ]);
+        const config = await configRes.json().catch(() => ({}));
+        if (!configRes.ok || !config.publishableKey) {
+          setPaymentStatus(statusEl, config.message || 'Stripe is not configured yet.', 'warn');
+          return;
+        }
+
+        const intentRes = await fetch('/.netlify/functions/create-payment-intent', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            amountCents,
+            purpose: 'support',
+            captureMethod: 'automatic',
+          }),
+        });
+        const intent = await intentRes.json().catch(() => ({}));
+        if (!intentRes.ok || !intent.clientSecret) {
+          setPaymentStatus(statusEl, intent.message || 'Could not start payment.', 'warn');
+          return;
+        }
+
+        const stripe = window.Stripe(config.publishableKey);
+        const elements = stripe.elements({ clientSecret: intent.clientSecret });
+        const paymentElement = elements.create('payment', {
+          layout: { type: 'accordion', defaultCollapsed: false },
+        });
+        elementEl.hidden = false;
+        paymentElement.mount(elementEl);
+        activeSupportPayment = { stripe, elements, amountCents };
+        payBtn.hidden = false;
+        payBtn.disabled = false;
+        payBtn.onclick = () => confirmSupportPayment(payBtn, statusEl);
+        setPaymentStatus(statusEl, 'Secure payment is ready.', '');
+      } catch (e) {
+        setPaymentStatus(statusEl, e.message || 'Could not prepare payment.', 'warn');
+      } finally {
+        if (startBtn) startBtn.disabled = false;
+      }
+    }
+
+    async function confirmSupportPayment(payBtn, statusEl) {
+      if (!activeSupportPayment) return;
+      payBtn.disabled = true;
+      payBtn.textContent = 'Paying...';
+      setPaymentStatus(statusEl, 'Opening secure payment...', '');
+
+      const { stripe, elements, amountCents } = activeSupportPayment;
+      const { error, paymentIntent } = await stripe.confirmPayment({
+        elements,
+        confirmParams: { return_url: location.href },
+        redirect: 'if_required',
+      });
+
+      if (error) {
+        payBtn.disabled = false;
+        payBtn.textContent = `Pay ${formatUsd(amountCents)}`;
+        setPaymentStatus(statusEl, error.message || 'Payment was not completed.', 'warn');
+        return;
+      }
+
+      payBtn.textContent = 'Thank you';
+      setPaymentStatus(statusEl, `Thanks for supporting Courtside. Payment ${paymentIntent?.status || 'completed'}.`, 'ok');
+      track('support_payment_completed', { amountCents });
+    }
+
+    function wireSupportPaymentModule() {
+      const startBtn = document.getElementById('supportStartBtn');
+      const customEl = document.getElementById('supportCustomAmount');
+      const panelEl = document.getElementById('supportPaymentPanel');
+      const statusEl = document.getElementById('supportPaymentStatus');
+      if (!startBtn) return;
+
+      const resetPayment = () => {
+        activeSupportPayment = null;
+        if (panelEl) panelEl.hidden = true;
+        const elementEl = document.getElementById('supportPaymentElement');
+        const payBtn = document.getElementById('supportPayBtn');
+        if (elementEl) {
+          elementEl.hidden = true;
+          elementEl.innerHTML = '';
+        }
+        if (payBtn) {
+          payBtn.hidden = true;
+          payBtn.disabled = true;
+        }
+        setPaymentStatus(statusEl, '', '');
+      };
+
+      document.querySelectorAll('.support-amount').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.support-amount').forEach(item => item.classList.toggle('active', item === btn));
+          if (customEl) customEl.value = '';
+          updateSupportAmountLabel();
+          resetPayment();
+        });
+      });
+
+      if (customEl) {
+        customEl.addEventListener('input', () => {
+          document.querySelectorAll('.support-amount').forEach(item => item.classList.remove('active'));
+          updateSupportAmountLabel();
+          resetPayment();
+        });
+      }
+
+      updateSupportAmountLabel();
+      startBtn.addEventListener('click', () => {
+        const amountCents = updateSupportAmountLabel();
+        if (!Number.isInteger(amountCents) || amountCents < 100) {
+          setPaymentStatus(statusEl, 'Please enter at least $1.', 'warn');
+          return;
+        }
+        if (amountCents > 50000) {
+          setPaymentStatus(statusEl, 'Please enter $500 or less.', 'warn');
+          return;
+        }
+        track('support_payment_started', { amountCents });
+        prepareSupportPayment(amountCents);
+      });
+    }
+
+    async function submitInAppBooking(court, statusEl, manualFallbackEl, buttonEl, paymentPanelEl) {
+      const payload = buildBookingPayload(court);
+      const targetUrl = payload.webtracSearchUrl;
+      if (paymentPanelEl) paymentPanelEl.hidden = true;
+      activeStripePayment = null;
+      if (manualFallbackEl) {
+        manualFallbackEl.href = targetUrl;
+        manualFallbackEl.hidden = false;
+        manualFallbackEl.textContent = 'Open Arlington WebTrac →';
+      }
+      if (buttonEl) {
+        buttonEl.disabled = true;
+        buttonEl.textContent = 'Opening WebTrac...';
+      }
+      rememberLastCourt(court.id);
+      track('manual_webtrac_opened', {
+        sport: selectedSport,
+        court: court.id,
+        duration: bookingPrefs.duration,
+        date: bookingPrefs.date,
+        time: bookingPrefs.time,
+        source: 'production-reserve',
+      });
+      setReserveStatus(
+        statusEl,
+        'Opening Arlington WebTrac with this court and date. Choose the matching time block and complete final checkout through Arlington.',
+        'ok'
+      );
+      window.location.href = targetUrl;
+      return;
+
+      let keepPostCartState = false;
+      if (manualFallbackEl) {
+        manualFallbackEl.href = payload.webtracSearchUrl;
+        manualFallbackEl.hidden = true;
+      }
+      if (paymentPanelEl) paymentPanelEl.hidden = true;
+      activeStripePayment = null;
+      if (buttonEl) {
+        buttonEl.disabled = true;
+        buttonEl.textContent = 'Checking...';
+      }
+      const progress = startBookingProgressMessages(statusEl);
+
+      try {
+        const localWorker = localBookingWorkerConfig();
+        const headers = { 'Content-Type': 'application/json' };
+        if (localWorker?.token) headers.Authorization = `Bearer ${localWorker.token}`;
+        const res = await fetch(localWorker?.url || '/.netlify/functions/reserve', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(payload),
+        });
+        let data = await res.json().catch(() => ({}));
+        let responseOk = res.ok;
+
+        if (responseOk && data.status === 'booking_started' && data.jobId) {
+          const polled = await pollBookingJob(data.jobId);
+          data = polled.data;
+          responseOk = polled.ok;
+        }
+
+        if (responseOk && ['confirmed', 'qa_accepted', 'dry_run_ready', 'cart_updated'].includes(data.status)) {
+          progress.stop();
+          const cartReady = data.status === 'cart_updated';
+          const terminalBookingState = cartReady || data.status === 'confirmed';
+          track('booking_confirmed', {
+            sport: selectedSport,
+            court: court.id,
+            duration: bookingPrefs.duration,
+          });
+          rememberLastCourt(court.id);
+          if (terminalBookingState && buttonEl) {
+            keepPostCartState = true;
+            buttonEl.hidden = true;
+            buttonEl.disabled = true;
+          }
+          setReserveStatus(
+            statusEl,
+            cartReady
+              ? 'Court added to the Arlington WebTrac cart. Confirm booking and payment below.'
+              : data.message || 'Booking request accepted.',
+            'ok'
+          );
+          await prepareStripePayment(paymentPanelEl, data, payload);
+          return;
+        }
+
+        if (data.code === 'WEBTRAC_BOOKING_ADAPTER_REQUIRED') {
+          progress.stop();
+          if (manualFallbackEl) manualFallbackEl.hidden = false;
+          setReserveStatus(
+            statusEl,
+            'This v3 UI is ready, but invisible booking needs the server-side WebTrac booking agent to be connected. The manual fallback is available while that adapter is built.',
+            'warn'
+          );
+          return;
+        }
+
+        if (data.message) {
+          progress.stop();
+          setReserveStatus(statusEl, data.message, 'warn');
+        } else {
+          progress.stop();
+          setReserveStatus(statusEl, 'Could not complete the booking request. Please try another slot.', 'warn');
+        }
+      } catch (e) {
+        progress.stop();
+        if (manualFallbackEl) manualFallbackEl.hidden = false;
+        setReserveStatus(statusEl, 'Booking service is not reachable. Manual fallback is available for testing.', 'warn');
+      } finally {
+        progress.stop();
+        if (buttonEl && !keepPostCartState) {
+          buttonEl.disabled = false;
+          buttonEl.textContent = 'Continue to WebTrac';
+          buttonEl.hidden = false;
+        }
+      }
+    }
+
+    async function pollBookingJob(jobId) {
+      const maxAttempts = 75;
+      let lastData = null;
+      let lastOk = false;
+      for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+        await new Promise(resolve => setTimeout(resolve, attempt === 0 ? 1200 : 2000));
+        const res = await fetch(`/.netlify/functions/reserve-status?jobId=${encodeURIComponent(jobId)}`, {
+          headers: { 'Cache-Control': 'no-store' },
+        });
+        const data = await res.json().catch(() => ({}));
+        lastData = data;
+        lastOk = res.ok;
+        if (data.status !== 'booking_running' && data.code !== 'WEBTRAC_BOOKING_RUNNING') {
+          return { ok: res.ok, data };
+        }
+      }
+      return {
+        ok: false,
+        data: {
+          status: 'worker_timeout',
+          code: 'WEBTRAC_BOOKING_STATUS_TIMEOUT',
+          message: lastData?.message || 'Courtside is still waiting on WebTrac. Try checking again in a moment.',
+          lastOk,
+        },
+      };
     }
 
     // -------------------- Views --------------------
@@ -1244,7 +3209,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
       card.innerHTML = `
         <h1>What are you<br><em>playing?</em></h1>
-        <p class="perm-body">Pick a sport — we'll find the closest court.</p>
+        <p class="perm-body">Pick a sport, then choose when you want to play. We'll show courts with availability.</p>
         ${recentHtml}
         ${buttons}
         <a href="#" class="inline-link" data-action="share" data-cta-id="home-share"
@@ -1256,11 +3221,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           selectedSport = btn.dataset.sport;
           rememberSport(selectedSport);
           track('sport_selected', { sport: selectedSport });
-          continueToLocation();
+          renderTimeFirstSearch();
         });
       });
 
-      // Recent-court shortcut click → straight to WebTrac.
+      // Recent-court shortcut → jump to the court screen with the date/time
+      // picker, NOT directly to WebTrac. User still has to choose when to play.
       const recent = document.getElementById('recentShortcut');
       if (recent) {
         recent.addEventListener('click', (e) => {
@@ -1271,11 +3237,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           if (!court) return;
           selectedSport = sport;
           rememberSport(sport);
-          rememberLastCourt(court.id);
           track('recent_shortcut_used', { sport, court: court.id });
-          track('webtrac_opened', { sport, court: court.id, source: 'recent-shortcut' });
-          sessionStorage.setItem('lastBooking', JSON.stringify({ sport, when: Date.now() }));
-          location.href = webtracUrl(court.code);
+          // No userLoc → no "show more courts" link and no distance.
+          // Pass the court without a dist field so the render hides the
+          // distance line and changes the label to just "Court".
+          renderPostBooking({ ...court });
         });
       }
     }
@@ -1284,6 +3250,141 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     function wireBackLink() {
       const el = document.getElementById('backLink');
       if (el) el.addEventListener('click', () => renderSportPicker());
+    }
+
+    function timePickerHtml() {
+      initBookingPrefsIfNeeded();
+      const minDateAttr = defaultBookingDateISO();
+      const maxDateAttr = maxBookingDateISO();
+      return `
+        <div class="when-picker">
+          <p class="when-label">When?</p>
+          <div class="when-row">
+            <input class="when-input" type="date"
+                   id="prefDate" min="${minDateAttr}" max="${maxDateAttr}"
+                   value="${bookingPrefs.date}" required>
+            <select class="when-input" id="prefTime" required>
+              ${listBookingTimes(bookingPrefs.duration).map(t => `
+                <option value="${t.value}"${t.value === bookingPrefs.time ? ' selected' : ''}>${t.label}</option>
+              `).join('')}
+            </select>
+          </div>
+          <div class="duration-toggle" role="radiogroup" aria-label="Duration">
+            <button type="button" class="seg${bookingPrefs.duration === 60 ? ' active' : ''}" data-duration="60" role="radio" aria-checked="${bookingPrefs.duration === 60}">60 min</button>
+            <button type="button" class="seg${bookingPrefs.duration === 90 ? ' active' : ''}" data-duration="90" role="radio" aria-checked="${bookingPrefs.duration === 90}">90 min</button>
+          </div>
+          <div class="booking-range" id="bookingRange">${formatBookingRange()}</div>
+        </div>`;
+    }
+
+    function wireStandaloneTimePicker(onChange) {
+      const dateEl = document.getElementById('prefDate');
+      const timeEl = document.getElementById('prefTime');
+      const rangeEl = document.getElementById('bookingRange');
+      const updateRange = () => {
+        if (rangeEl) rangeEl.textContent = formatBookingRange();
+        if (onChange) onChange();
+      };
+      const rebuildTimeDropdown = () => {
+        if (!timeEl) return;
+        const current = bookingPrefs.time;
+        const times = listBookingTimes(bookingPrefs.duration);
+        if (!times.length) {
+          timeEl.innerHTML = '<option value="">No valid times</option>';
+          timeEl.disabled = true;
+          bookingPrefs.time = '';
+          updateRange();
+          return;
+        }
+        timeEl.disabled = false;
+        timeEl.innerHTML = times.map(t =>
+          `<option value="${t.value}">${t.label}</option>`
+        ).join('');
+        const stillValid = times.find(t => t.value === current);
+        const next = stillValid || times[0];
+        timeEl.value = next.value;
+        bookingPrefs.time = next.value;
+        updateRange();
+      };
+
+      if (dateEl) dateEl.addEventListener('change', () => {
+        if (!dateEl.value) return;
+        bookingPrefs.date = dateEl.value;
+        rebuildTimeDropdown();
+      });
+      if (timeEl) timeEl.addEventListener('change', () => {
+        if (!timeEl.value) return;
+        bookingPrefs.time = timeEl.value;
+        updateRange();
+      });
+      card.querySelectorAll('.duration-toggle .seg').forEach(seg => {
+        seg.addEventListener('click', () => {
+          bookingPrefs.duration = parseInt(seg.dataset.duration, 10);
+          card.querySelectorAll('.duration-toggle .seg').forEach(s => {
+            const active = s === seg;
+            s.classList.toggle('active', active);
+            s.setAttribute('aria-checked', String(active));
+          });
+          rebuildTimeDropdown();
+        });
+      });
+    }
+
+    function renderTimeFirstSearch(errMsg) {
+      card.innerHTML = `
+        ${backLinkHtml}
+        ${sportIconSvg(selectedSport, false)}
+        <h1>When do you<br><em>want to play?</em></h1>
+        <p class="perm-body">
+          Choose a time first. Then Courtside will show nearby courts and how much availability each one has.
+        </p>
+        ${errMsg ? `<div class="error">${errMsg}</div>` : ''}
+        ${timePickerHtml()}
+        <div class="time-search-actions">
+          <button class="btn btn-primary" id="nearbySearchBtn" type="button">Find courts near me</button>
+          <button class="btn btn-secondary" id="browseCourtsBtn" type="button">Browse all courts</button>
+          <button class="btn btn-ghost" id="atCourtBtn" type="button">I'm at a court</button>
+        </div>
+        <p class="rules-hint">Arlington rules: 1-14 days ahead · 60 or 90 min · closes 9pm</p>
+      `;
+      wireStandaloneTimePicker();
+      document.getElementById('nearbySearchBtn').addEventListener('click', requestCourtSearchLocation);
+      document.getElementById('browseCourtsBtn').addEventListener('click', () => {
+        track('court_search_browse_all', { sport: selectedSport });
+        renderCourtSearchResults(null);
+      });
+      document.getElementById('atCourtBtn').addEventListener('click', () => {
+        track('at_court_flow_started', { sport: selectedSport });
+        continueToLocation();
+      });
+      wireBackLink();
+    }
+
+    function requestCourtSearchLocation() {
+      renderSearchLocating();
+      if (!('geolocation' in navigator)) {
+        renderCourtSearchResults(null, 'Your browser does not support geolocation, so here are all courts for this sport.');
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        pos => {
+          track('court_search_location_granted', { sport: selectedSport });
+          const userLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+          renderCourtSearchResults(userLoc);
+        },
+        err => {
+          track('court_search_location_failed', { code: err.code, sport: selectedSport });
+          const msg = err.code === 1
+            ? 'Location is blocked. You can still browse all courts for this time.'
+            : err.code === 2
+              ? "Couldn't determine your location. Showing all courts instead."
+              : err.code === 3
+                ? 'Location request timed out. Showing all courts instead.'
+                : 'Could not get your location. Showing all courts instead.';
+          renderCourtSearchResults(null, msg);
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+      );
     }
 
     function renderPermissionPrompt() {
@@ -1296,24 +3397,31 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             <circle cx="12" cy="10" r="3"/>
           </svg>
         </div>
-        <h1>Find<br><em>your court</em></h1>
+        <h1>Are you<br><em>at a court?</em></h1>
         <p class="perm-body">
-          We'll use your location to pick the right court and open the court's
-          availability on WebTrac.
+          This shortcut is only for players standing at or beside a court. Otherwise, use the time-first search.
         </p>
-        <button class="btn btn-primary" id="allowBtn">Use my location</button>
-        <button class="btn btn-secondary" id="pickBtn">Pick manually</button>
+        <button class="btn btn-primary" id="allowBtn">Use my court location</button>
+        <button class="btn btn-secondary" id="pickBtn">Search by time instead</button>
       `;
       document.getElementById('allowBtn').addEventListener('click', requestLocation);
-      document.getElementById('pickBtn').addEventListener('click', () => renderFallback());
+      document.getElementById('pickBtn').addEventListener('click', () => renderTimeFirstSearch());
       wireBackLink();
     }
 
     function renderLocating() {
       card.innerHTML = `
         ${sportIconSvg(selectedSport, true)}
-        <h1>Finding the<br><em>closest court</em></h1>
+        <h1>Checking your<br><em>court location</em></h1>
         <p class="status" id="status">Getting your location…</p>
+      `;
+    }
+
+    function renderSearchLocating() {
+      card.innerHTML = `
+        ${sportIconSvg(selectedSport, true)}
+        <h1>Checking<br><em>availability</em></h1>
+        <p class="status" id="status">Finding courts near you for ${formatBookingRange()}…</p>
       `;
     }
 
@@ -1341,14 +3449,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           </p>
         </div>
         <button class="btn btn-primary" id="retryBtn">Try again</button>
-        <button class="btn btn-outline" id="pickBtn">Pick a court manually</button>
+        <button class="btn btn-outline" id="pickBtn">Search by time instead</button>
         <button class="btn btn-secondary" id="skipBtn">Just open the booking site</button>
       `;
       document.getElementById('retryBtn').addEventListener('click', () => location.reload());
       document.getElementById('skipBtn').addEventListener('click', () => {
         location.href = webtracAllCourtsUrl();
       });
-      document.getElementById('pickBtn').addEventListener('click', () => renderFallback());
+      document.getElementById('pickBtn').addEventListener('click', () => renderTimeFirstSearch());
       wireBackLink();
     }
 
@@ -1364,30 +3472,24 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           const userLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
           const sorted = courtsWithDistances(userLoc.lat, userLoc.lng);
           const court = sorted[0];
-          const second = sorted[1];
           if (!court || !court.code || court.code === 'TBD') {
-            renderFallback(
+            renderCourtSearchResults(
+              userLoc,
               court
                 ? `The closest court (${court.name}) isn't configured yet — ` +
                   `its WebTrac location code needs to be filled in.`
-                : `No courts configured for this sport yet.`,
-              userLoc
+                : `No courts configured for this sport yet.`
             );
             return;
           }
-          // Auto-route if user is clearly AT a court. Two-pronged check
-          // because GPS error alone can push them past a strict absolute distance.
-          // The dominant-nearest branch is distance-capped so a user miles away
-          // never gets auto-routed just because one court is closer than the rest.
-          const withinAbsolute = court.dist <= AT_COURT_THRESHOLD_MI;
-          const dominantNearest = second
-            ? (court.dist <= DOMINANT_NEAREST_MAX_MI &&
-               court.dist < second.dist * DOMINANT_NEAREST_RATIO)
-            : false; // single-court case: rely on withinAbsolute only
-          if (withinAbsolute || dominantNearest) {
+          if (court.dist <= AT_COURT_THRESHOLD_MI) {
             renderPostBooking(court, userLoc);
           } else {
-            renderFallback(null, userLoc);
+            const dist = formatDist(court.dist);
+            renderCourtSearchResults(
+              userLoc,
+              `You do not appear to be right at a court. The nearest match is ${court.name} (${dist}), so here are available options for ${formatBookingRange()}.`
+            );
           }
         },
         err => {
@@ -1399,7 +3501,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
               err.code === 2 ? "Couldn't determine your location." :
               err.code === 3 ? 'Location request timed out.' :
               'Could not get your location.';
-            renderFallback(msg);
+            renderTimeFirstSearch(msg);
           }
         },
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
@@ -1429,9 +3531,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           </a>`;
       }).join('');
 
-      const distText = court
+      const hasDist = court && typeof court.dist === 'number';
+      const distText = hasDist
         ? (court.dist < 0.1 ? '<0.1 mi' : `${court.dist.toFixed(1)} mi away`)
         : '';
+      const courtLabel = hasDist ? 'Closest court' : 'Court';
 
       const metaHtml = court ? buildCourtMetaHtml(court) : '';
 
@@ -1441,26 +3545,72 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         <a href="#" id="showMoreCourtsLink" class="inline-link" style="display: inline-block; margin-top: 14px; font-size: 14px;">Show more courts →</a>
       ` : '';
 
+      // v3: pre-render booking prefs so the picker is populated.
+      initBookingPrefsIfNeeded();
+      const minDateAttr = defaultBookingDateISO();
+      const maxDateAttr = maxBookingDateISO();
+
       const header = court ? `
         ${sportIconSvg(selectedSport, false)}
-        <p class="status">Closest court</p>
+        <p class="status">${courtLabel}</p>
         <div class="nearest-name">${court.name}</div>
-        <div class="nearest-dist">${distText}</div>
+        ${distText ? `<div class="nearest-dist">${distText}</div>` : ''}
         <div class="weather-line" id="weatherLine" hidden></div>
         ${metaHtml}
-        <div style="height: 18px;"></div>
-        <button class="btn btn-primary" id="openWebtracBtn">Open booking site →</button>
+
+        <div class="when-picker">
+          <p class="when-label">When?</p>
+          <div class="when-row">
+            <input class="when-input" type="date"
+                   id="prefDate" min="${minDateAttr}" max="${maxDateAttr}"
+                   value="${bookingPrefs.date}" required>
+            <select class="when-input" id="prefTime" required>
+              ${listBookingTimes(bookingPrefs.duration).map(t => `
+                <option value="${t.value}"${t.value === bookingPrefs.time ? ' selected' : ''}>${t.label}</option>
+              `).join('')}
+            </select>
+          </div>
+          <div class="duration-toggle" role="radiogroup" aria-label="Duration">
+            <button type="button" class="seg${bookingPrefs.duration === 60 ? ' active' : ''}" data-duration="60" role="radio" aria-checked="${bookingPrefs.duration === 60}">60 min</button>
+            <button type="button" class="seg${bookingPrefs.duration === 90 ? ' active' : ''}" data-duration="90" role="radio" aria-checked="${bookingPrefs.duration === 90}">90 min</button>
+          </div>
+          <div class="booking-range" id="bookingRange">${formatBookingRange()}</div>
+          <div class="court-unit-picker" id="courtUnitPicker" hidden>
+            <p class="when-label">Court</p>
+            <div class="court-unit-grid" id="courtUnitGrid"></div>
+          </div>
+          <div class="avail-status" id="availStatus"></div>
+        </div>
+
+        <button class="btn btn-primary" id="reserveBtn">Continue to WebTrac</button>
+        <div class="reserve-status" id="reserveStatus" hidden></div>
+        <div class="payment-panel" id="paymentPanel" hidden aria-live="polite">
+          <div class="payment-head">
+            <span>Confirm booking</span>
+            <strong class="payment-amount" id="paymentAmount">$--</strong>
+          </div>
+          <div class="payment-element" id="paymentElement"></div>
+          <p class="booking-disclosure">
+            Your court is in the Arlington WebTrac cart. Confirm payment to finish the booking.
+            Arlington County Parks & Recreation/WebTrac will be the official booking system;
+            Arlington's cancellation, refund, facility, and surcharge policies apply.
+          </p>
+          <button class="btn btn-primary" id="payBtn" type="button">Confirm booking / pay</button>
+          <div class="payment-status" id="paymentStatus"></div>
+        </div>
+        <a class="btn btn-secondary" id="manualWebtracBtn"
+           href="${webtracUrl(court.code)}" hidden>Open Arlington WebTrac →</a>
         <div class="secondary-actions">
           <a class="btn btn-ghost" id="directionsBtn"
              href="${directionsUrl(court)}" target="_blank" rel="noopener">Directions</a>
           <button class="btn btn-ghost" id="shareBtn" type="button">Share</button>
         </div>
-        <div class="rules-hint">Reservations open 1–14 days ahead · 60 or 90 min slots</div>
+        <div class="rules-hint">Arlington rules: 1–14 days ahead · 60 or 90 min · closes 9pm</div>
         ${showMoreCourtsHtml}
         <div class="cta-divider">While you're here</div>
       ` : `
         ${sportIconSvg(selectedSport, false)}
-        <h1>Got your<br><em>slot?</em></h1>
+        <h1>Got your<br><em>slot</em></h1>
         <p class="perm-body">A few things while you're here:</p>
       `;
 
@@ -1483,12 +3633,137 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       });
 
       if (court) {
-        document.getElementById('openWebtracBtn').addEventListener('click', () => {
-          track('webtrac_opened', { sport: selectedSport, court: court.id, source: 'auto-route' });
-          sessionStorage.setItem('lastBooking', JSON.stringify({ sport: selectedSport, when: Date.now() }));
-          // Persist remembered court for the next visit (Feature 4).
-          rememberLastCourt(court.id);
-          location.href = webtracUrl(court.code);
+        // Wire the When picker — update bookingPrefs live on change.
+        const dateEl = document.getElementById('prefDate');
+        const timeEl = document.getElementById('prefTime');
+        const rangeEl = document.getElementById('bookingRange');
+        const availStatusEl = document.getElementById('availStatus');
+        const reserveStatusEl = document.getElementById('reserveStatus');
+        const manualFallbackEl = document.getElementById('manualWebtracBtn');
+        const reserveBtn = document.getElementById('reserveBtn');
+        const paymentPanelEl = document.getElementById('paymentPanel');
+
+        const updateRangeLabel = () => {
+          if (rangeEl) rangeEl.textContent = formatBookingRange();
+        };
+        const resetReserveFeedback = () => {
+          if (reserveStatusEl) reserveStatusEl.hidden = true;
+          if (paymentPanelEl) paymentPanelEl.hidden = true;
+          activeStripePayment = null;
+          if (reserveBtn) {
+            reserveBtn.hidden = false;
+            reserveBtn.disabled = false;
+            reserveBtn.textContent = 'Continue to WebTrac';
+          }
+          if (manualFallbackEl) {
+            manualFallbackEl.href = webtracUrl(court.code);
+            manualFallbackEl.hidden = true;
+          }
+        };
+        const resetBookingUi = () => {
+          updateRangeLabel();
+          resetReserveFeedback();
+        };
+
+        // Rebuild the time <select> when duration changes — fewer valid start
+        // times for 90-min (latest 7:30pm) vs 60-min (latest 8:00pm).
+        // Preserves the user's current pick if still valid, else snaps to the
+        // latest valid slot.
+        const rebuildTimeDropdown = () => {
+          if (!timeEl) return;
+          const current = bookingPrefs.time;
+          const times = listBookingTimes(bookingPrefs.duration);
+          if (!times.length) {
+            timeEl.innerHTML = '<option value="">No valid times</option>';
+            bookingPrefs.time = '';
+            timeEl.disabled = true;
+            if (reserveBtn) reserveBtn.disabled = true;
+            if (availStatusEl) availStatusEl.textContent = 'Pick a later date; Arlington requires at least 24 hours advance notice.';
+            return;
+          }
+          timeEl.disabled = false;
+          if (reserveBtn) reserveBtn.disabled = false;
+          timeEl.innerHTML = times.map(t =>
+            `<option value="${t.value}">${t.label}</option>`
+          ).join('');
+          const stillValid = times.find(t => t.value === current);
+          if (stillValid) {
+            timeEl.value = current;
+          } else {
+            const replacement = current ? times[times.length - 1] : times[0];
+            timeEl.value = replacement.value;
+            bookingPrefs.time = replacement.value;
+          }
+          refreshAvailability(court, availStatusEl, resetBookingUi);
+        };
+
+        if (dateEl) dateEl.addEventListener('change', () => {
+          if (dateEl.value) {
+            bookingPrefs.date = dateEl.value;
+            rebuildTimeDropdown();
+            updateRangeLabel();
+            resetReserveFeedback();
+          }
+        });
+        if (timeEl) timeEl.addEventListener('change', () => {
+          if (timeEl.value) {
+            bookingPrefs.time = timeEl.value;
+            updateRangeLabel();
+            resetReserveFeedback();
+          }
+        });
+        card.querySelectorAll('.duration-toggle .seg').forEach(seg => {
+          seg.addEventListener('click', () => {
+            bookingPrefs.duration = parseInt(seg.dataset.duration, 10);
+            card.querySelectorAll('.duration-toggle .seg').forEach(s => {
+              const active = s === seg;
+              s.classList.toggle('active', active);
+              s.setAttribute('aria-checked', String(active));
+            });
+            rebuildTimeDropdown();
+            updateRangeLabel();
+            resetReserveFeedback();
+          });
+        });
+        refreshAvailability(court, availStatusEl, resetBookingUi);
+
+        reserveBtn.addEventListener('click', async () => {
+          console.log('[booking] reserve requested:', {
+            court: court.id,
+            sport: selectedSport,
+            date: bookingPrefs.date,
+            time: bookingPrefs.time,
+            duration: bookingPrefs.duration,
+          });
+          track('booking_agreement_opened', {
+            sport: selectedSport,
+            court: court.id,
+            duration: bookingPrefs.duration,
+            date: bookingPrefs.date,
+            time: bookingPrefs.time,
+          });
+          const acceptedAgreement = await showBookingAgreement(court);
+          if (!acceptedAgreement) {
+            track('booking_agreement_declined', {
+              sport: selectedSport,
+              court: court.id,
+              duration: bookingPrefs.duration,
+            });
+            return;
+          }
+          track('booking_requested', {
+            sport: selectedSport,
+            court: court.id,
+            duration: bookingPrefs.duration,
+            date: bookingPrefs.date,
+            time: bookingPrefs.time,
+          });
+          track('booking_agreement_accepted', {
+            sport: selectedSport,
+            court: court.id,
+            duration: bookingPrefs.duration,
+          });
+          submitInAppBooking(court, reserveStatusEl, manualFallbackEl, reserveBtn, paymentPanelEl);
         });
         // Track directions clicks too.
         document.getElementById('directionsBtn').addEventListener('click', () => {
@@ -1593,6 +3868,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     function renderContact() {
+      const topic = params.get('topic');
+      const isCoachInquiry = topic === 'coach-sonny';
+      const messagePlaceholder = isCoachInquiry
+        ? 'Tell us your preferred lesson days, player age/level, and what you want to work on.'
+        : "What's on your mind?";
       card.innerHTML = `
         ${backLinkHtml}
         <div class="pin-circle">
@@ -1601,15 +3881,16 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             <path d="M4 7l8 6 8-6"/>
           </svg>
         </div>
-        <h1>Send us<br><em>a message</em></h1>
-        <p class="perm-body">Ideas, feedback, partnership pitches, bugs — straight to our inbox. We read everything.</p>
+        <h1>${isCoachInquiry ? 'Ask about<br><em>lessons</em>' : 'Send us<br><em>a message</em>'}</h1>
+        <p class="perm-body">${isCoachInquiry ? 'Tell us what kind of lesson you are looking for and we will follow up.' : 'Ideas, feedback, partnership pitches, bugs — straight to our inbox. We read everything.'}</p>
         <form id="contactForm" class="notify-form"
               name="contact" method="POST" data-netlify="true" netlify-honeypot="bot-field">
           <input type="hidden" name="form-name" value="contact">
+          <input type="hidden" name="topic" value="${isCoachInquiry ? 'coach-sonny' : 'general'}">
           <p hidden><label>Don't fill this out: <input name="bot-field"></label></p>
           <input id="cName" name="name" type="text" placeholder="Your name (optional)" autocomplete="name">
           <input id="cEmail" name="email" type="email" placeholder="you@example.com" autocomplete="email" inputmode="email" required>
-          <textarea id="cMessage" name="message" placeholder="What's on your mind?" rows="5" required></textarea>
+          <textarea id="cMessage" name="message" placeholder="${messagePlaceholder}" rows="5" required></textarea>
           <div class="notify-error" id="contactError"></div>
           <button class="btn btn-primary" type="submit" id="contactSubmit">Send</button>
         </form>
@@ -1706,10 +3987,22 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
         <div class="module">
           <div class="module-label">Buy us a coffee</div>
-          <p>Like what we're building? A coffee helps keep the work going.</p>
-          <!-- TODO: replace href below with the real Buy Me a Coffee URL once set up,
-               then drop the ?view=coming-soon placeholder. -->
-          <a class="btn btn-ghost" href="?view=coming-soon&cat=buy-us-coffee" data-cta-id="wwu-coffee">Buy us a coffee</a>
+          <p>Like what we're building? Any amount is appreciated. Five dollars starts the tab.</p>
+          <div class="support-amounts" role="group" aria-label="Support amount">
+            <button class="support-amount active" type="button" data-amount="500">$5</button>
+            <button class="support-amount" type="button" data-amount="1000">$10</button>
+            <button class="support-amount" type="button" data-amount="2000">$20</button>
+          </div>
+          <label class="support-custom">
+            <span>Custom</span>
+            <input id="supportCustomAmount" type="number" min="1" step="1" inputmode="decimal" placeholder="Amount">
+          </label>
+          <button class="btn btn-ghost" id="supportStartBtn" type="button" data-cta-id="wwu-coffee">Continue with $5.00</button>
+          <div class="support-payment" id="supportPaymentPanel" hidden>
+            <div class="payment-element" id="supportPaymentElement" hidden></div>
+            <button class="btn btn-primary" id="supportPayBtn" type="button" hidden>Pay $5.00</button>
+            <div class="payment-status" id="supportPaymentStatus"></div>
+          </div>
         </div>
 
         <div class="module">
@@ -1726,7 +4019,51 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         <button class="btn btn-secondary" id="homeBtn" style="margin-top: 4px;">Back to start</button>
       `;
       document.getElementById('homeBtn').addEventListener('click', () => { location.href = location.pathname; });
+      wireSupportPaymentModule();
       wireNotifyForm();
+      wireBackLink();
+    }
+
+    function coachCardHtml(coach) {
+      const photo = coach.photo
+        ? `<img src="${coach.photo}" alt="${coach.photoAlt}" loading="lazy">`
+        : `<span>${coach.initials}</span>`;
+      return `
+        <article class="coach-card">
+          <div class="coach-top">
+            <div class="coach-photo">${photo}</div>
+            <div>
+              <p class="module-label">Featured coach</p>
+              <h2 class="coach-name">${coach.name}</h2>
+              <p class="status" style="margin:0;">${coach.title}</p>
+              <div class="coach-meta">
+                ${coach.tags.map(tag => `<span class="coach-pill">${tag}</span>`).join('')}
+              </div>
+            </div>
+          </div>
+          <p class="coach-bio">${coach.bio}</p>
+          <div class="coach-focus">
+            ${coach.focus.map(item => `<span>${item}</span>`).join('')}
+          </div>
+          <a class="btn btn-primary" href="?view=contact&topic=coach-sonny" data-cta-id="coach-sonny-contact">Ask about lessons</a>
+        </article>`;
+    }
+
+    function renderCoaches() {
+      card.innerHTML = `
+        ${backLinkHtml}
+        <div class="pin-circle">
+          ${ICONS.coach}
+        </div>
+        <h1>Find<br><em>a coach</em></h1>
+        <p class="perm-body">Private tennis lessons from local coaches who know Arlington courts.</p>
+        ${COACHES.map(coachCardHtml).join('')}
+        <button class="btn btn-secondary" id="homeBtn" style="margin-top: 2px;">Back to start</button>
+      `;
+      document.getElementById('homeBtn').addEventListener('click', () => { location.href = location.pathname; });
+      card.querySelectorAll('a[data-cta-id]').forEach(a => {
+        a.addEventListener('click', () => recordClick(a.dataset.ctaId));
+      });
       wireBackLink();
     }
 
@@ -1812,97 +4149,202 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }).join('');
     }
 
-    const NEARBY_INITIAL_COUNT = 3;
+    let courtSearchRunId = 0;
+    const RESULT_COLLAPSED_LIMIT = 5;
 
-    // Renders the court list. Two modes:
-    //   - With userLoc (sorted by distance, distances shown)   → "Closest X courts"
-    //                                                            shows top 3 + Show more + CTAs
-    //   - Without userLoc (alphabetical, no distances)         → "Pick an X court"
-    //                                                            full list, no CTAs
-    function renderFallback(errMsg, userLoc) {
+    function initialResultSummaryForCourt(court) {
+      const disabled = !court.code || court.code === 'TBD';
+      if (disabled) {
+        return {
+          tone: 'warn',
+          label: 'Setup',
+          detail: 'WebTrac setup needed',
+          rankBucket: 4,
+          openCount: 0,
+          totalCount: court.numCourts || 0,
+          availabilityRatio: 0,
+        };
+      }
+      return {
+        tone: 'checking',
+        label: 'Checking',
+        detail: `Checking ${formatBookingRange()}`,
+        rankBucket: 1,
+        openCount: 0,
+        totalCount: court.numCourts || 0,
+        availabilityRatio: 0,
+      };
+    }
+
+    function resultMetaText(court, summary, nearby) {
+      const distance = nearby && typeof court.dist === 'number' ? `${formatDist(court.dist)} away` : '';
+      return [distance, summary.detail].filter(Boolean).join(' · ');
+    }
+
+    function availabilityRankBucket(summary) {
+      if (Number.isFinite(summary && summary.rankBucket)) return summary.rankBucket;
+      if (summary && summary.tone === 'open') return 0;
+      if (summary && summary.tone === 'warn') return 2;
+      if (summary && summary.tone === 'full') return 3;
+      return 1;
+    }
+
+    function compareResultStates(a, b, nearby) {
+      const bucketDelta = availabilityRankBucket(a.summary) - availabilityRankBucket(b.summary);
+      if (bucketDelta) return bucketDelta;
+
+      if (nearby) {
+        const distA = typeof a.court.dist === 'number' ? a.court.dist : Number.POSITIVE_INFINITY;
+        const distB = typeof b.court.dist === 'number' ? b.court.dist : Number.POSITIVE_INFINITY;
+        const distanceDelta = distA - distB;
+        if (Math.abs(distanceDelta) > 0.001) return distanceDelta;
+      }
+
+      const ratioDelta = (b.summary.availabilityRatio || 0) - (a.summary.availabilityRatio || 0);
+      if (Math.abs(ratioDelta) > 0.001) return ratioDelta;
+
+      const openDelta = (b.summary.openCount || 0) - (a.summary.openCount || 0);
+      if (openDelta) return openDelta;
+
+      return a.court.name.localeCompare(b.court.name) || a.index - b.index;
+    }
+
+    function rerankResultCards(resultStates, nearby) {
+      const list = card.querySelector('.result-list');
+      if (!list || !resultStates) return;
+      const orderedStates = Array.from(resultStates.values())
+        .sort((a, b) => compareResultStates(a, b, nearby));
+
+      orderedStates.forEach((state, index) => {
+        const node = list.querySelector(`[data-result-court-id="${state.court.id}"]`);
+        if (!node) return;
+        node.hidden = !resultStates.expanded && index >= RESULT_COLLAPSED_LIMIT;
+        list.appendChild(node);
+      });
+
+      const showMoreBtn = document.getElementById('showMoreResultsBtn');
+      if (!showMoreBtn) return;
+      const hiddenCount = Math.max(0, orderedStates.length - RESULT_COLLAPSED_LIMIT);
+      showMoreBtn.hidden = resultStates.expanded || hiddenCount === 0;
+      showMoreBtn.textContent = `Show ${hiddenCount} more courts`;
+    }
+
+    function resultCardHtml(court, nearby, summary = initialResultSummaryForCourt(court)) {
+      const disabled = !court.code || court.code === 'TBD';
+      const meta = resultMetaText(court, summary, nearby);
+      return `
+        <a class="result-card${disabled ? ' disabled' : ''}" href="#" data-result-court-id="${court.id}">
+          <span class="result-main">
+            <span class="result-name">${escapeHtml(court.name)}</span>
+            <span class="result-meta" data-result-meta="${court.id}">${escapeHtml(meta)}</span>
+          </span>
+          <span class="result-status ${summary.tone || ''}" data-result-status="${court.id}">
+            ${escapeHtml(summary.label)}
+          </span>
+        </a>`;
+    }
+
+    function updateResultCard(court, summary, nearby, resultStates) {
+      const statusEl = card.querySelector(`[data-result-status="${court.id}"]`);
+      const metaEl = card.querySelector(`[data-result-meta="${court.id}"]`);
+      if (!statusEl || !metaEl) return;
+      statusEl.className = `result-status ${summary.tone || ''}`.trim();
+      statusEl.textContent = summary.label;
+      metaEl.textContent = resultMetaText(court, summary, nearby);
+      if (resultStates && resultStates.has(court.id)) {
+        resultStates.get(court.id).summary = summary;
+        rerankResultCards(resultStates, nearby);
+      }
+    }
+
+    async function loadCourtSearchAvailability(courts, nearby, runId, resultStates) {
+      const queue = courts.filter(c => c.code && c.code !== 'TBD');
+      let next = 0;
+      const worker = async () => {
+        while (next < queue.length) {
+          const court = queue[next++];
+          const availability = await fetchAvailability(court.code, SPORTS[selectedSport].type);
+          if (runId !== courtSearchRunId) return;
+          updateResultCard(court, availabilitySummaryForSelectedRange(availability, court), nearby, resultStates);
+        }
+      };
+      await Promise.all([worker(), worker(), worker()]);
+    }
+
+    function renderCourtSearchResults(userLoc, errMsg) {
+      initBookingPrefsIfNeeded();
       const sport = SPORTS[selectedSport];
       const nearby = userLoc != null;
       const courts = nearby
         ? courtsWithDistances(userLoc.lat, userLoc.lng)
         : courtsForSelectedSport();
-      const items = courts.map((c, i) => {
-        const disabled = !c.code || c.code === 'TBD';
-        const href = disabled ? '#' : webtracUrl(c.code);
-        const right = disabled
-          ? '<span class="tag">setup needed</span>'
-          : (nearby
-              ? `<span class="pick-meta">${formatDist(c.dist)} <span class="pick-arrow">→</span></span>`
-              : '<span class="arrow">→</span>');
-        const hidden = nearby && i >= NEARBY_INITIAL_COUNT ? ' collapsed' : '';
-        return `
-          <a class="pick${disabled ? ' disabled' : ''}${hidden}" href="${href}" data-court-id="${c.id}">
-            <span class="pick-name">${c.name}</span>
-            ${right}
-          </a>`;
-      }).join('');
-
+      const resultStates = new Map(courts.map((court, index) => [
+        court.id,
+        {
+          court,
+          index,
+          summary: initialResultSummaryForCourt(court),
+        },
+      ]));
+      resultStates.expanded = courts.length <= RESULT_COLLAPSED_LIMIT;
       const title = nearby
-        ? `Closest ${sport.label.toLowerCase()} courts`
-        : `Pick a ${sport.label.toLowerCase()} court`;
-      const sub = nearby
-        ? `<p class="perm-body" style="margin-bottom: 16px;">Here are some courts near you.</p>`
-        : '';
+        ? `${sport.label} near you`
+        : `${sport.label} courts`;
+      const summary = nearby
+        ? `Ranking available courts first, then nearest options for ${formatBookingRange()}.`
+        : `Ranking available ${sport.label.toLowerCase()} courts first for ${formatBookingRange()}.`;
 
-      const showMoreBtn = (nearby && courts.length > NEARBY_INITIAL_COUNT)
-        ? `<button class="btn btn-ghost" id="showMoreBtn" style="margin-top: 14px;">Show more</button>`
-        : '';
-
-      const skipBtn = nearby
-        ? `<button class="btn btn-secondary" id="skipBtn">Continue to booking site</button>`
-        : '';
-
-      const ctaSection = nearby ? `
-        <div class="cta-divider">While you're here</div>
-        <div class="cta-list">${buildCtaListHtml()}</div>
-      ` : '';
-
+      const runId = ++courtSearchRunId;
       card.innerHTML = `
         ${backLinkHtml}
         ${sportIconSvg(selectedSport, false)}
         <h1>${title}</h1>
-        ${sub}
+        <div class="search-summary">${summary}</div>
         ${errMsg ? `<div class="error">${errMsg}</div>` : ''}
-        <div class="picker">${items}</div>
-        ${showMoreBtn}
-        ${skipBtn}
-        ${ctaSection}
+        <div class="result-list">
+          ${courts.map(c => resultCardHtml(c, nearby, resultStates.get(c.id).summary)).join('')}
+        </div>
+        <button class="btn btn-secondary show-more-results" id="showMoreResultsBtn" type="button" hidden>Show more courts</button>
+        <div class="results-toolbar">
+          <button class="btn btn-secondary" id="changeTimeBtn" type="button">Change time</button>
+          <a class="btn btn-ghost" id="manualAllBtn" href="${webtracAllCourtsUrl()}">WebTrac fallback</a>
+        </div>
       `;
 
-      // Tapping a court in the list goes to WebTrac AND marks the session so
-      // the post-booking CTAs render on back-navigation.
-      card.querySelectorAll('a[data-court-id]').forEach(a => {
-        a.addEventListener('click', () => {
-          track('webtrac_opened', { sport: selectedSport, court: a.dataset.courtId, source: 'court-list' });
-          sessionStorage.setItem('lastBooking', JSON.stringify({ sport: selectedSport, when: Date.now() }));
+      card.querySelectorAll('a[data-result-court-id]').forEach(a => {
+        a.addEventListener('click', (e) => {
+          e.preventDefault();
+          const courtId = a.dataset.resultCourtId;
+          const court = courts.find(c => c.id === courtId);
+          if (!court || !court.code || court.code === 'TBD') return;
+          track('court_selected_from_results', {
+            sport: selectedSport,
+            court: courtId,
+            source: nearby ? 'nearby-availability' : 'all-availability',
+          });
+          renderPostBooking(court, userLoc);
         });
       });
 
-      // CTA click tracking
-      card.querySelectorAll('a[data-cta-id]').forEach(a => {
-        a.addEventListener('click', () => recordClick(a.dataset.ctaId));
-      });
-
-      // Show more button reveals collapsed courts
-      const showMore = document.getElementById('showMoreBtn');
-      if (showMore) {
-        showMore.addEventListener('click', () => {
-          card.querySelectorAll('.pick.collapsed').forEach(el => el.classList.remove('collapsed'));
-          showMore.style.display = 'none';
+      document.getElementById('showMoreResultsBtn')?.addEventListener('click', () => {
+        resultStates.expanded = true;
+        rerankResultCards(resultStates, nearby);
+        track('court_results_expanded', {
+          sport: selectedSport,
+          source: nearby ? 'nearby-availability' : 'all-availability',
         });
-      }
-
-      // "Just take me to the booking site" — opens WebTrac with all courts of this sport
-      const skip = document.getElementById('skipBtn');
-      if (skip) {
-        skip.addEventListener('click', () => { location.href = webtracAllCourtsUrl(); });
-      }
-
+      });
+      document.getElementById('changeTimeBtn')?.addEventListener('click', () => renderTimeFirstSearch());
+      document.getElementById('manualAllBtn')?.addEventListener('click', () => {
+        track('manual_webtrac_all_opened', { sport: selectedSport });
+      });
       wireBackLink();
+      rerankResultCards(resultStates, nearby);
+      loadCourtSearchAvailability(courts, nearby, runId, resultStates);
+    }
+
+    function renderFallback(errMsg, userLoc) {
+      renderCourtSearchResults(userLoc || null, errMsg);
     }
 
     // -------------------- Main --------------------
@@ -1931,6 +4373,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const view = params.get('view');
       if (params.has('qr'))           return renderQrDisplay();
       if (view === 'dashboard')       return renderDashboard();
+      if (view === 'coaches')         return renderCoaches();
       if (view === 'contact')         return renderContact();
       if (view === 'coming-soon') {
         // The Work with us page has its own multi-module layout.
