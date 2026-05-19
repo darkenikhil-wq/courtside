@@ -452,16 +452,52 @@ async function waitForLoginSettle(page) {
 
 async function assertLoggedIn(page) {
   const bodyText = await page.locator('body').innerText({ timeout: 5000 }).catch(() => '');
+  const diagnostics = await loginPageDiagnostics(page, bodyText);
+  if (diagnostics.cloudflareBlocked) {
+    throw codedError(
+      'WEBTRAC_ACCESS_BLOCKED',
+      'WebTrac/Cloudflare blocked this worker environment after the login form was submitted.',
+      diagnostics
+    );
+  }
   if (/invalid|incorrect|failed|try again/i.test(bodyText) && /password|login|username/i.test(bodyText)) {
-    throw codedError('LOGIN_FAILED', 'WebTrac rejected the supplied username or password.');
+    throw codedError('LOGIN_FAILED', 'WebTrac rejected the supplied username or password.', diagnostics);
   }
   if (/active session already exists|continue with login/i.test(bodyText)) {
-    throw codedError('ACTIVE_SESSION_NOT_RESOLVED', 'WebTrac asked to resume an active session, but the worker could not complete that prompt.');
+    throw codedError('ACTIVE_SESSION_NOT_RESOLVED', 'WebTrac asked to resume an active session, but the worker could not complete that prompt.', diagnostics);
   }
   const authState = authStateFromText(bodyText);
   if (authState === 'signed_out') {
-    throw codedError('LOGIN_NOT_CONFIRMED', 'WebTrac still appears signed out after submitting the login form.');
+    throw codedError('LOGIN_NOT_CONFIRMED', 'WebTrac still appears signed out after submitting the login form.', diagnostics);
   }
+}
+
+async function loginPageDiagnostics(page, bodyText = '') {
+  const text = bodyText || await page.locator('body').innerText({ timeout: 5000 }).catch(() => '');
+  const title = await page.title().catch(() => '');
+  const visibleInputs = await page.locator('input:visible').evaluateAll((inputs) => inputs.slice(0, 12).map((input) => ({
+    type: input.getAttribute('type') || '',
+    name: input.getAttribute('name') || '',
+    id: input.getAttribute('id') || '',
+    placeholder: input.getAttribute('placeholder') || '',
+    autocomplete: input.getAttribute('autocomplete') || '',
+  }))).catch(() => []);
+  const visibleButtons = await page.locator('button:visible, input[type="submit"]:visible, a:visible').evaluateAll((items) => items.slice(0, 20).map((item) => ({
+    tag: item.tagName.toLowerCase(),
+    type: item.getAttribute('type') || '',
+    name: item.getAttribute('name') || '',
+    id: item.getAttribute('id') || '',
+    text: (item.innerText || item.value || item.getAttribute('aria-label') || '').replace(/\s+/g, ' ').trim().slice(0, 120),
+  }))).catch(() => []);
+  return {
+    landedUrl: page.url(),
+    title,
+    authState: authStateFromText(text),
+    cloudflareBlocked: isCloudflareBlocked(text, title),
+    snippet: text.replace(/\s+/g, ' ').slice(0, 600),
+    visibleInputs,
+    visibleButtons,
+  };
 }
 
 async function handleActiveSessionPrompt(page) {
