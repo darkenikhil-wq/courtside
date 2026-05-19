@@ -163,6 +163,16 @@ BROWSERLESS_STEALTH=true
 PLAYWRIGHT_CONNECT_MODE=cdp
 ```
 
+If WebTrac blocks the hosted browser's datacenter IP, enable Browserless'
+residential proxy and keep the IP sticky for the whole reservation attempt:
+
+```text
+BROWSERLESS_PROXY=residential
+BROWSERLESS_PROXY_COUNTRY=us
+BROWSERLESS_PROXY_STICKY=true
+BROWSERLESS_PROXY_PRESET=px_gov01
+```
+
 ## Connecting v3
 
 For local testing, expose this service or run a small tunnel, then set the v3

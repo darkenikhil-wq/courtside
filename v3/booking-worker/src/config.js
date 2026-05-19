@@ -4,6 +4,11 @@ const browserlessToken = process.env.BROWSERLESS_TOKEN || '';
 const browserlessRegion = process.env.BROWSERLESS_REGION || 'sfo';
 const browserlessStealth = process.env.BROWSERLESS_STEALTH !== 'false';
 const browserlessRoute = process.env.BROWSERLESS_ROUTE || (browserlessStealth ? 'stealth' : 'chrome');
+const browserlessProxy = process.env.BROWSERLESS_PROXY || '';
+const browserlessProxyCountry = process.env.BROWSERLESS_PROXY_COUNTRY || '';
+const browserlessProxyCity = process.env.BROWSERLESS_PROXY_CITY || '';
+const browserlessProxySticky = process.env.BROWSERLESS_PROXY_STICKY || '';
+const browserlessProxyPreset = process.env.BROWSERLESS_PROXY_PRESET || '';
 const explicitBrowserEndpoint = process.env.PLAYWRIGHT_WS_ENDPOINT || process.env.BROWSER_WS_ENDPOINT || '';
 
 export const config = {
@@ -45,11 +50,21 @@ function browserlessEndpoint() {
   if (!browserlessToken) return '';
   const route = normalizeBrowserlessRoute(browserlessRoute);
   const params = new URLSearchParams({ token: browserlessToken });
+  addBrowserlessParam(params, 'proxy', browserlessProxy);
+  addBrowserlessParam(params, 'proxyCountry', browserlessProxyCountry);
+  addBrowserlessParam(params, 'proxyCity', browserlessProxyCity);
+  addBrowserlessParam(params, 'proxySticky', browserlessProxySticky);
+  addBrowserlessParam(params, 'proxyPreset', browserlessProxyPreset);
   return `wss://production-${browserlessRegion}.browserless.io/${route}?${params.toString()}`;
 }
 
 function normalizeBrowserlessRoute(route) {
   return String(route || 'stealth').replace(/^\/+/, '').replace(/\/+$/, '') || 'stealth';
+}
+
+function addBrowserlessParam(params, name, value) {
+  if (!value) return;
+  params.set(name, value);
 }
 
 export function assertRuntimeConfig() {
