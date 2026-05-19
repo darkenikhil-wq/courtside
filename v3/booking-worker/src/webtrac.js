@@ -203,7 +203,12 @@ export async function finalizeWebtracCheckout(options = {}) {
     let fillResult = { skipped: true, reason: 'no_card_entry_detected' };
     let paymentEntry = await inspectPaymentEntryPage(paymentPage);
 
-    if (checkoutState.needsPaymentMethod) {
+    const shouldPreparePaymentEntry = config.allowWebtracFinalPayment;
+
+    if (checkoutState.needsPaymentMethod && !shouldPreparePaymentEntry) {
+      selected = { selected: false, skipped: true, reason: 'final_payment_guard_disabled' };
+      entryContinue = { clicked: false, skipped: true, reason: 'final_payment_guard_disabled', url: page.url() };
+    } else if (checkoutState.needsPaymentMethod) {
       assertPaymentConfig();
       selected = await selectPaymentMethodOption(page, /Credit Card - Web/i);
       if (!selected.selected) {
@@ -236,7 +241,9 @@ export async function finalizeWebtracCheckout(options = {}) {
       paymentEntry = await inspectPaymentEntryPage(paymentPage);
     }
 
-    if (paymentEntry.markers.hasCardField || paymentEntry.markers.hasExpirationField || paymentEntry.markers.hasSecurityCodeField) {
+    if (!shouldPreparePaymentEntry && (paymentEntry.markers.hasCardField || paymentEntry.markers.hasExpirationField || paymentEntry.markers.hasSecurityCodeField)) {
+      fillResult = { skipped: true, reason: 'final_payment_guard_disabled' };
+    } else if (paymentEntry.markers.hasCardField || paymentEntry.markers.hasExpirationField || paymentEntry.markers.hasSecurityCodeField) {
       assertPaymentConfig();
       fillResult = await fillWebtracPaymentProfile(paymentPage);
       paymentEntry = await inspectPaymentEntryPage(paymentPage);
