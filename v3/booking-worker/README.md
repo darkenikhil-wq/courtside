@@ -55,6 +55,12 @@ npm run doctor
 npm run start
 ```
 
+If local disk space gets tight after browser runs:
+
+```bash
+npm run clean
+```
+
 Smoke test from another terminal:
 
 ```bash

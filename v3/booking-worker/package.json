@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
+    "clean": "node src/clean.js",
     "doctor": "node src/doctor.js",
     "smoke": "node src/smoke.js"
   },
