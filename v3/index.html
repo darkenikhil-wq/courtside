@@ -625,6 +625,90 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       line-height: 1.45;
       color: var(--muted);
     }
+    .agreement-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 1200;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      background: rgba(4, 8, 13, 0.72);
+      backdrop-filter: blur(10px);
+    }
+    .agreement-backdrop[hidden] { display: none; }
+    .agreement-sheet {
+      width: min(100%, 430px);
+      max-height: min(720px, calc(100vh - 40px));
+      overflow: auto;
+      padding: 22px;
+      border-radius: 20px;
+      border: 1px solid rgba(var(--accent-rgb), 0.26);
+      background: var(--card);
+      box-shadow: 0 24px 70px -28px rgba(0, 0, 0, 0.70);
+      text-align: left;
+    }
+    .agreement-kicker {
+      margin: 0 0 8px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+    .agreement-title {
+      margin: 0 0 10px;
+      font-size: 24px;
+      line-height: 1.15;
+      color: var(--ink);
+    }
+    .agreement-summary {
+      margin: 0 0 14px;
+      font-size: 14px;
+      line-height: 1.5;
+      color: var(--muted);
+    }
+    .agreement-list {
+      display: grid;
+      gap: 9px;
+      margin: 0 0 16px;
+      padding: 0;
+      list-style: none;
+    }
+    .agreement-list li {
+      padding: 10px 11px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: rgba(255,255,255,0.035);
+      color: var(--ink);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    .agreement-check {
+      display: grid;
+      grid-template-columns: 20px 1fr;
+      gap: 10px;
+      align-items: start;
+      margin: 0 0 16px;
+      color: var(--ink);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    .agreement-check input {
+      width: 18px;
+      height: 18px;
+      margin: 2px 0 0;
+      accent-color: var(--accent);
+    }
+    .agreement-actions {
+      display: grid;
+      grid-template-columns: 1fr 1.35fr;
+      gap: 10px;
+    }
+    .agreement-actions .btn { margin-bottom: 0; }
+    @media (max-width: 480px) {
+      .agreement-sheet { padding: 20px; border-radius: 18px; }
+      .agreement-actions { grid-template-columns: 1fr; }
+    }
     .payment-status {
       margin-top: 8px;
       min-height: 1em;
@@ -2025,6 +2109,76 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       };
     }
 
+    function showBookingAgreement(court) {
+      return new Promise((resolve) => {
+        const existing = document.getElementById('bookingAgreement');
+        if (existing) existing.remove();
+
+        const courtUnit = selectedCourtUnitPayload(court);
+        const courtLabel = [
+          court?.name,
+          courtUnit?.displayLabel || courtUnit?.label,
+          bookingPrefs.date,
+          formatBookingRange(),
+        ].filter(Boolean).join(' · ');
+
+        const backdrop = document.createElement('div');
+        backdrop.className = 'agreement-backdrop';
+        backdrop.id = 'bookingAgreement';
+        backdrop.setAttribute('role', 'dialog');
+        backdrop.setAttribute('aria-modal', 'true');
+        backdrop.setAttribute('aria-labelledby', 'bookingAgreementTitle');
+        backdrop.innerHTML = `
+          <div class="agreement-sheet">
+            <p class="agreement-kicker">Arlington/WebTrac agreement</p>
+            <h2 class="agreement-title" id="bookingAgreementTitle">Review before Courtside books</h2>
+            <p class="agreement-summary">
+              Courtside will submit this reservation request through Arlington County Parks & Recreation/WebTrac for:
+              <strong>${escapeHtml(courtLabel)}</strong>
+            </p>
+            <ul class="agreement-list">
+              <li>The official reservation, confirmation, cancellation, refund, facility-use, and surcharge policies are Arlington/WebTrac policies.</li>
+              <li>Courtside is acting as your booking helper and may log in, select this court, enter required headcount, accept required facility prompts, and proceed with checkout steps for this reservation.</li>
+              <li>If Arlington/WebTrac changes availability, rejects the cart, or requires manual review, Courtside may stop before payment or release any card authorization.</li>
+              <li>Cancellation, refund, adjustment, and facility questions should be handled with Arlington DPR/Facilities Scheduling.</li>
+            </ul>
+            <label class="agreement-check">
+              <input type="checkbox" id="bookingAgreementCheck">
+              <span>I understand and authorize Courtside to continue through Arlington/WebTrac for this reservation request.</span>
+            </label>
+            <div class="agreement-actions">
+              <button class="btn btn-ghost" type="button" id="bookingAgreementCancel">Cancel</button>
+              <button class="btn btn-primary" type="button" id="bookingAgreementAccept" disabled>Agree and continue</button>
+            </div>
+          </div>
+        `;
+
+        const finish = (accepted) => {
+          backdrop.remove();
+          document.removeEventListener('keydown', onKeydown);
+          resolve(accepted);
+        };
+        const onKeydown = (event) => {
+          if (event.key === 'Escape') finish(false);
+        };
+
+        document.body.appendChild(backdrop);
+        const check = backdrop.querySelector('#bookingAgreementCheck');
+        const accept = backdrop.querySelector('#bookingAgreementAccept');
+        const cancel = backdrop.querySelector('#bookingAgreementCancel');
+        check?.focus();
+        check?.addEventListener('change', () => {
+          if (accept) accept.disabled = !check.checked;
+        });
+        accept?.addEventListener('click', () => finish(Boolean(check?.checked)));
+        cancel?.addEventListener('click', () => finish(false));
+        backdrop.addEventListener('click', (event) => {
+          if (event.target === backdrop) finish(false);
+        });
+        document.addEventListener('keydown', onKeydown);
+      });
+    }
+
     let stripeScriptPromise = null;
     let activeStripePayment = null;
     let activeSupportPayment = null;
@@ -3139,7 +3293,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         });
         refreshAvailability(court, availStatusEl, resetBookingUi);
 
-        reserveBtn.addEventListener('click', () => {
+        reserveBtn.addEventListener('click', async () => {
           console.log('[booking] reserve requested:', {
             court: court.id,
             sport: selectedSport,
@@ -3147,12 +3301,33 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             time: bookingPrefs.time,
             duration: bookingPrefs.duration,
           });
+          track('booking_agreement_opened', {
+            sport: selectedSport,
+            court: court.id,
+            duration: bookingPrefs.duration,
+            date: bookingPrefs.date,
+            time: bookingPrefs.time,
+          });
+          const acceptedAgreement = await showBookingAgreement(court);
+          if (!acceptedAgreement) {
+            track('booking_agreement_declined', {
+              sport: selectedSport,
+              court: court.id,
+              duration: bookingPrefs.duration,
+            });
+            return;
+          }
           track('booking_requested', {
             sport: selectedSport,
             court: court.id,
             duration: bookingPrefs.duration,
             date: bookingPrefs.date,
             time: bookingPrefs.time,
+          });
+          track('booking_agreement_accepted', {
+            sport: selectedSport,
+            court: court.id,
+            duration: bookingPrefs.duration,
           });
           submitInAppBooking(court, reserveStatusEl, manualFallbackEl, reserveBtn, paymentPanelEl);
         });
