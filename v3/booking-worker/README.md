@@ -67,6 +67,13 @@ Smoke test from another terminal:
 npm run smoke
 ```
 
+After a court is in the WebTrac cart, inspect the remaining checkout path
+without entering or submitting payment:
+
+```bash
+npm run inspect:checkout
+```
+
 ## Modes
 
 - `DRY_RUN=true`: logs in, opens the WebTrac search page, and verifies that

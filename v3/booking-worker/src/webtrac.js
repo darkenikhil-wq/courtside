@@ -90,6 +90,69 @@ export async function reserveWithWebtrac(payload) {
   }
 }
 
+export async function inspectCheckoutFlow(options = {}) {
+  await resetArtifactDir();
+  const browser = await chromium.launch({
+    headless: config.headless,
+    slowMo: config.slowMo,
+    executablePath: config.chromeExecutablePath || undefined,
+    artifactsPath: config.artifactDir,
+  });
+  const context = await browser.newContext({
+    viewport: { width: 1280, height: 900 },
+    userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+  });
+  const page = await context.newPage();
+
+  try {
+    await login(page);
+    await page.goto(WEBTRAC_ORIGIN + '/webtrac/web/cart.html', { waitUntil: 'domcontentloaded', timeout: 45000 });
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+
+    const steps = [];
+    const maxSteps = Math.min(Math.max(Number(options.maxSteps || 6), 1), 10);
+
+    for (let step = 1; step <= maxSteps; step += 1) {
+      const snapshot = await inspectCheckoutStep(page, step);
+      steps.push(snapshot);
+
+      if (snapshot.stopReason) {
+        return {
+          status: 'checkout_inspected',
+          code: 'CHECKOUT_INSPECTION_STOPPED',
+          message: checkoutStopMessage(snapshot.stopReason),
+          stopReason: snapshot.stopReason,
+          steps,
+        };
+      }
+
+      const clickResult = await clickCheckoutInspectionNext(page);
+      snapshot.nextAction = clickResult;
+      if (!clickResult.clicked) {
+        return {
+          status: 'checkout_inspected',
+          code: 'CHECKOUT_INSPECTION_NO_SAFE_NEXT_STEP',
+          message: 'Checkout inspection stopped because no safe non-payment next step was found.',
+          stopReason: 'no_safe_next_step',
+          steps,
+        };
+      }
+    }
+
+    return {
+      status: 'checkout_inspected',
+      code: 'CHECKOUT_INSPECTION_STEP_LIMIT',
+      message: 'Checkout inspection reached the configured step limit before payment or final confirmation.',
+      stopReason: 'step_limit',
+      steps,
+    };
+  } finally {
+    await context.close().catch(() => {});
+    await browser.close().catch(() => {});
+    await resetArtifactDir().catch(() => {});
+  }
+}
+
 async function resetArtifactDir() {
   await fs.rm(config.artifactDir, { recursive: true, force: true });
   await fs.mkdir(config.artifactDir, { recursive: true });
@@ -269,6 +332,131 @@ async function confirmCartState(page, searchUrl) {
     bodySnippet: last.snippet || '',
     attempts,
   };
+}
+
+async function inspectCheckoutStep(page, step) {
+  await page.waitForLoadState('domcontentloaded', { timeout: 15000 }).catch(() => {});
+  await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {});
+  const bodyText = await page.locator('body').innerText({ timeout: 10000 }).catch(() => '');
+  const compact = bodyText.replace(/\s+/g, ' ').trim();
+  const controls = await relevantCheckoutControls(page);
+  const cartState = await inspectCartPage(page).catch(() => null);
+  const markers = checkoutMarkers(compact, controls, page.url());
+
+  return {
+    step,
+    url: page.url(),
+    title: await page.title().catch(() => ''),
+    markers,
+    cart: cartState && {
+      confirmed: cartState.confirmed,
+      itemCount: cartState.itemCount,
+      grandTotal: cartState.grandTotal,
+      amountToday: cartState.amountToday,
+      hasProceedToCheckout: cartState.hasProceedToCheckout,
+      hasPaymentPrompt: cartState.hasPaymentPrompt,
+    },
+    controls,
+    stopReason: checkoutStopReason(markers),
+  };
+}
+
+async function relevantCheckoutControls(page) {
+  return page.evaluate(() => {
+    function visible(el) {
+      const style = window.getComputedStyle(el);
+      const rect = el.getBoundingClientRect();
+      return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0;
+    }
+
+    function labelFor(el) {
+      return [
+        el.innerText,
+        el.value,
+        el.getAttribute('aria-label'),
+        el.getAttribute('title'),
+        el.getAttribute('name'),
+        el.getAttribute('id'),
+      ].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+    }
+
+    return Array.from(document.querySelectorAll('button, input[type="submit"], input[type="button"], a'))
+      .filter(visible)
+      .map((el) => ({
+        tag: el.tagName.toLowerCase(),
+        label: labelFor(el),
+        id: el.getAttribute('id') || '',
+        name: el.getAttribute('name') || '',
+      }))
+      .filter((item) => /continue|next|checkout|payment|pay|submit|complete|confirm|cart|agree|place order|purchase/i.test(item.label))
+      .slice(0, 25);
+  });
+}
+
+function checkoutMarkers(text, controls, url) {
+  const labelText = controls.map((control) => control.label).join(' ');
+  const combined = `${url} ${text} ${labelText}`;
+  return {
+    cartEmpty: /cart\s*\(0\s+items?\)|cart\s+is\s+empty|no\s+items\s+in\s+your\s+cart/i.test(combined),
+    hasCartItem: /cart\s*\([1-9]\d*\s+items?\)|Remove.{0,500}\$\s*[0-9,.]+|Facility\s+Reservation.{0,500}\$\s*[0-9,.]+/i.test(combined),
+    hasProceedToCheckout: /proceed\s+to\s+checkout/i.test(combined),
+    hasContinue: /\bcontinue\b|\bnext\b/i.test(labelText),
+    hasPaymentPrompt: /payment\s+method|credit\s+card|card\s+number|select\s+a\s+payment|security\s+code|expiration\s+date/i.test(combined),
+    hasFinalPaymentAction: /submit\s+payment|complete\s+(order|transaction)|place\s+order|make\s+payment|process\s+payment|confirm\s+(and\s+)?pay|purchase/i.test(combined),
+  };
+}
+
+function checkoutStopReason(markers) {
+  if (markers.cartEmpty) return 'empty_cart';
+  if (markers.hasPaymentPrompt) return 'payment_page';
+  if (markers.hasFinalPaymentAction) return 'final_payment_action';
+  return null;
+}
+
+function checkoutStopMessage(reason) {
+  if (reason === 'empty_cart') return 'Checkout inspection stopped because the WebTrac cart is empty.';
+  if (reason === 'payment_page') return 'Checkout inspection reached the payment step and stopped before entering or submitting payment.';
+  if (reason === 'final_payment_action') return 'Checkout inspection found a final payment/confirmation action and stopped before clicking it.';
+  return 'Checkout inspection stopped.';
+}
+
+async function clickCheckoutInspectionNext(page) {
+  const selectors = [
+    '#webcart_buttoncheckout',
+    '[id*="checkout" i]',
+    '[name*="checkout" i]',
+    '[id*="buttoncontinue" i]',
+    '[name*="buttoncontinue" i]',
+    'input[type="submit"]',
+    'button[type="submit"]',
+    'button',
+    'a',
+  ];
+
+  for (const selector of selectors) {
+    const locators = await page.locator(selector).filter({ visible: true }).all().catch(() => []);
+    for (const locator of locators) {
+      const label = await controlLabel(locator);
+      if (!isSafeCheckoutInspectionLabel(label)) continue;
+
+      await Promise.all([
+        page.waitForLoadState('domcontentloaded', { timeout: 15000 }).catch(() => {}),
+        locator.click(),
+      ]);
+      await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+      return { clicked: true, selector, label: label.replace(/\s+/g, ' ').trim(), url: page.url() };
+    }
+  }
+
+  return { clicked: false, reason: 'safe_checkout_next_not_found' };
+}
+
+function isSafeCheckoutInspectionLabel(label) {
+  const text = String(label || '');
+  if (/payment|pay|complete|purchase|place\s+order|submit\s+payment|make\s+payment|process\s+payment|confirm\s+(and\s+)?pay/i.test(text)) {
+    return false;
+  }
+  return /proceed\s+to\s+checkout|\bcontinue\b|\bnext\b/i.test(text);
 }
 
 function authStateFromText(bodyText) {

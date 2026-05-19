@@ -29,15 +29,22 @@ exports.handler = async (event) => {
   }
 
   const booking = body.booking && typeof body.booking === 'object' ? body.booking : {};
+  const purpose = body.purpose === 'support' ? 'support' : 'court_booking';
+  const captureMethod = body.captureMethod === 'automatic' ? 'automatic' : 'manual';
   const params = new URLSearchParams();
   params.set('amount', String(amount));
   params.set('currency', 'usd');
-  params.set('capture_method', 'manual');
+  params.set('capture_method', captureMethod);
   params.set('automatic_payment_methods[enabled]', 'true');
-  params.set('metadata[court]', String(booking.courtName || booking.courtCode || '').slice(0, 120));
-  params.set('metadata[date]', String(booking.date || '').slice(0, 20));
-  params.set('metadata[start]', String(booking.start || '').slice(0, 20));
+  params.set('description', purpose === 'support' ? 'Courtside support payment' : 'Courtside court booking authorization');
+  params.set('metadata[purpose]', purpose);
+  params.set('metadata[capture_method]', captureMethod);
   params.set('metadata[source]', 'courtside-v3-qa');
+  if (purpose === 'court_booking') {
+    params.set('metadata[court]', String(booking.courtName || booking.courtCode || '').slice(0, 120));
+    params.set('metadata[date]', String(booking.date || '').slice(0, 20));
+    params.set('metadata[start]', String(booking.start || '').slice(0, 20));
+  }
 
   const stripeRes = await fetch('https://api.stripe.com/v1/payment_intents', {
     method: 'POST',

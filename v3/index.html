@@ -623,6 +623,52 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     .module .btn { margin-bottom: 0; }
     .module .notify-form { margin: 0; }
     .module .notify-fineprint { margin-top: 0; }
+    .support-amounts {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      margin: 10px 0;
+    }
+    .support-amount {
+      min-height: 44px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.04);
+      color: var(--ink);
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .support-amount.active {
+      border-color: rgba(var(--accent-rgb), 0.55);
+      background: rgba(var(--accent-rgb), 0.12);
+      color: var(--accent);
+    }
+    .support-custom {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      align-items: center;
+      gap: 8px;
+      margin: 0 0 10px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .support-custom input {
+      width: 100%;
+      min-height: 42px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.04);
+      color: var(--ink);
+      padding: 0 12px;
+      font: inherit;
+    }
+    .support-payment {
+      margin-top: 12px;
+      display: grid;
+      gap: 10px;
+    }
+    .support-payment[hidden] { display: none; }
     .coach-card {
       display: grid;
       gap: 14px;
@@ -806,6 +852,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       cursor: pointer;
       transition: transform 0.05s ease, opacity 0.15s ease;
     }
+    [hidden] { display: none !important; }
     .btn:active { transform: scale(0.98); }
     .btn:disabled {
       cursor: wait;
@@ -1750,6 +1797,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     let stripeScriptPromise = null;
     let activeStripePayment = null;
+    let activeSupportPayment = null;
 
     function formatUsd(cents) {
       return new Intl.NumberFormat('en-US', {
@@ -1802,8 +1850,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       panelEl.hidden = false;
       if (amountEl) amountEl.textContent = amountCents ? formatUsd(amountCents) : '$--';
       if (elementEl) elementEl.innerHTML = '';
-      if (payBtn) payBtn.disabled = true;
-      setPaymentStatus(paymentStatusEl, 'Preparing Apple Pay / card test payment...', '');
+      if (payBtn) {
+        payBtn.disabled = true;
+        payBtn.textContent = 'Confirm booking / pay';
+      }
+      setPaymentStatus(paymentStatusEl, 'Preparing secure payment...', '');
 
       if (!amountCents) {
         setPaymentStatus(paymentStatusEl, 'No payment amount was found in the WebTrac cart response.', 'warn');
@@ -1854,7 +1905,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           payBtn.disabled = false;
           payBtn.onclick = () => confirmStripePayment(payBtn, paymentStatusEl);
         }
-        setPaymentStatus(paymentStatusEl, 'Stripe test mode is ready. Final WebTrac checkout is still paused.', '');
+        setPaymentStatus(paymentStatusEl, 'Secure payment is ready. Final Arlington/WebTrac checkout is still paused for inspection.', '');
       } catch (e) {
         setPaymentStatus(paymentStatusEl, e.message || 'Could not prepare payment.', 'warn');
       }
@@ -1863,7 +1914,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     async function confirmStripePayment(payBtn, paymentStatusEl) {
       if (!activeStripePayment) return;
       payBtn.disabled = true;
-      payBtn.textContent = 'Authorizing...';
+      payBtn.textContent = 'Confirming...';
       setPaymentStatus(paymentStatusEl, 'Opening secure payment...', '');
 
       const { stripe, elements, amountCents } = activeStripePayment;
@@ -1875,7 +1926,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
       if (error) {
         payBtn.disabled = false;
-        payBtn.textContent = 'Pay with Apple Pay / Card';
+        payBtn.textContent = 'Confirm booking / pay';
         setPaymentStatus(paymentStatusEl, error.message || 'Payment was not completed.', 'warn');
         return;
       }
@@ -1883,13 +1934,177 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       payBtn.textContent = 'Payment authorized';
       setPaymentStatus(
         paymentStatusEl,
-        `Stripe test payment ${paymentIntent?.status || 'completed'} for ${formatUsd(amountCents)}. Final Arlington/WebTrac checkout remains paused.`,
+        `Payment ${paymentIntent?.status || 'authorized'} for ${formatUsd(amountCents)}. Final Arlington/WebTrac checkout remains paused for inspection.`,
         'ok'
       );
     }
 
+    function supportAmountCents() {
+      const customEl = document.getElementById('supportCustomAmount');
+      const activePreset = document.querySelector('.support-amount.active');
+      const hasCustomValue = Boolean(customEl && customEl.value.trim());
+      const customValue = Number(customEl?.value || 0);
+      if (hasCustomValue && Number.isFinite(customValue)) {
+        return Math.round(customValue * 100);
+      }
+      return Number(activePreset?.dataset.amount || 500);
+    }
+
+    function updateSupportAmountLabel() {
+      const amountCents = supportAmountCents();
+      const startBtn = document.getElementById('supportStartBtn');
+      const payBtn = document.getElementById('supportPayBtn');
+      if (startBtn) startBtn.textContent = `Continue with ${formatUsd(amountCents)}`;
+      if (payBtn) payBtn.textContent = `Pay ${formatUsd(amountCents)}`;
+      return amountCents;
+    }
+
+    async function prepareSupportPayment(amountCents) {
+      const panelEl = document.getElementById('supportPaymentPanel');
+      const elementEl = document.getElementById('supportPaymentElement');
+      const statusEl = document.getElementById('supportPaymentStatus');
+      const payBtn = document.getElementById('supportPayBtn');
+      const startBtn = document.getElementById('supportStartBtn');
+      if (!panelEl || !elementEl || !payBtn) return;
+
+      panelEl.hidden = false;
+      elementEl.innerHTML = '';
+      elementEl.hidden = true;
+      activeSupportPayment = null;
+      payBtn.disabled = true;
+      payBtn.hidden = true;
+      if (startBtn) startBtn.disabled = true;
+      setPaymentStatus(statusEl, 'Preparing secure payment...', '');
+
+      try {
+        const [configRes] = await Promise.all([
+          fetch('/.netlify/functions/stripe-config', { headers: { 'Cache-Control': 'no-store' } }),
+          loadStripeScript(),
+        ]);
+        const config = await configRes.json().catch(() => ({}));
+        if (!configRes.ok || !config.publishableKey) {
+          setPaymentStatus(statusEl, config.message || 'Stripe is not configured yet.', 'warn');
+          return;
+        }
+
+        const intentRes = await fetch('/.netlify/functions/create-payment-intent', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            amountCents,
+            purpose: 'support',
+            captureMethod: 'automatic',
+          }),
+        });
+        const intent = await intentRes.json().catch(() => ({}));
+        if (!intentRes.ok || !intent.clientSecret) {
+          setPaymentStatus(statusEl, intent.message || 'Could not start payment.', 'warn');
+          return;
+        }
+
+        const stripe = window.Stripe(config.publishableKey);
+        const elements = stripe.elements({ clientSecret: intent.clientSecret });
+        const paymentElement = elements.create('payment', {
+          layout: { type: 'accordion', defaultCollapsed: false },
+        });
+        elementEl.hidden = false;
+        paymentElement.mount(elementEl);
+        activeSupportPayment = { stripe, elements, amountCents };
+        payBtn.hidden = false;
+        payBtn.disabled = false;
+        payBtn.onclick = () => confirmSupportPayment(payBtn, statusEl);
+        setPaymentStatus(statusEl, 'Secure payment is ready.', '');
+      } catch (e) {
+        setPaymentStatus(statusEl, e.message || 'Could not prepare payment.', 'warn');
+      } finally {
+        if (startBtn) startBtn.disabled = false;
+      }
+    }
+
+    async function confirmSupportPayment(payBtn, statusEl) {
+      if (!activeSupportPayment) return;
+      payBtn.disabled = true;
+      payBtn.textContent = 'Paying...';
+      setPaymentStatus(statusEl, 'Opening secure payment...', '');
+
+      const { stripe, elements, amountCents } = activeSupportPayment;
+      const { error, paymentIntent } = await stripe.confirmPayment({
+        elements,
+        confirmParams: { return_url: location.href },
+        redirect: 'if_required',
+      });
+
+      if (error) {
+        payBtn.disabled = false;
+        payBtn.textContent = `Pay ${formatUsd(amountCents)}`;
+        setPaymentStatus(statusEl, error.message || 'Payment was not completed.', 'warn');
+        return;
+      }
+
+      payBtn.textContent = 'Thank you';
+      setPaymentStatus(statusEl, `Thanks for supporting Courtside. Payment ${paymentIntent?.status || 'completed'}.`, 'ok');
+      track('support_payment_completed', { amountCents });
+    }
+
+    function wireSupportPaymentModule() {
+      const startBtn = document.getElementById('supportStartBtn');
+      const customEl = document.getElementById('supportCustomAmount');
+      const panelEl = document.getElementById('supportPaymentPanel');
+      const statusEl = document.getElementById('supportPaymentStatus');
+      if (!startBtn) return;
+
+      const resetPayment = () => {
+        activeSupportPayment = null;
+        if (panelEl) panelEl.hidden = true;
+        const elementEl = document.getElementById('supportPaymentElement');
+        const payBtn = document.getElementById('supportPayBtn');
+        if (elementEl) {
+          elementEl.hidden = true;
+          elementEl.innerHTML = '';
+        }
+        if (payBtn) {
+          payBtn.hidden = true;
+          payBtn.disabled = true;
+        }
+        setPaymentStatus(statusEl, '', '');
+      };
+
+      document.querySelectorAll('.support-amount').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.support-amount').forEach(item => item.classList.toggle('active', item === btn));
+          if (customEl) customEl.value = '';
+          updateSupportAmountLabel();
+          resetPayment();
+        });
+      });
+
+      if (customEl) {
+        customEl.addEventListener('input', () => {
+          document.querySelectorAll('.support-amount').forEach(item => item.classList.remove('active'));
+          updateSupportAmountLabel();
+          resetPayment();
+        });
+      }
+
+      updateSupportAmountLabel();
+      startBtn.addEventListener('click', () => {
+        const amountCents = updateSupportAmountLabel();
+        if (!Number.isInteger(amountCents) || amountCents < 100) {
+          setPaymentStatus(statusEl, 'Please enter at least $1.', 'warn');
+          return;
+        }
+        if (amountCents > 50000) {
+          setPaymentStatus(statusEl, 'Please enter $500 or less.', 'warn');
+          return;
+        }
+        track('support_payment_started', { amountCents });
+        prepareSupportPayment(amountCents);
+      });
+    }
+
     async function submitInAppBooking(court, statusEl, manualFallbackEl, buttonEl, paymentPanelEl) {
       const payload = buildBookingPayload(court);
+      let keepPostCartState = false;
       if (manualFallbackEl) {
         manualFallbackEl.href = payload.webtracSearchUrl;
         manualFallbackEl.hidden = true;
@@ -1915,13 +2130,26 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
         if (res.ok && ['confirmed', 'qa_accepted', 'dry_run_ready', 'cart_updated'].includes(data.status)) {
           progress.stop();
+          const cartReady = data.status === 'cart_updated';
+          const terminalBookingState = cartReady || data.status === 'confirmed';
           track('booking_confirmed', {
             sport: selectedSport,
             court: court.id,
             duration: bookingPrefs.duration,
           });
           rememberLastCourt(court.id);
-          setReserveStatus(statusEl, data.message || 'Booking request accepted.', 'ok');
+          if (terminalBookingState && buttonEl) {
+            keepPostCartState = true;
+            buttonEl.hidden = true;
+            buttonEl.disabled = true;
+          }
+          setReserveStatus(
+            statusEl,
+            cartReady
+              ? 'Court added to the Arlington WebTrac cart. Confirm booking and payment below.'
+              : data.message || 'Booking request accepted.',
+            'ok'
+          );
           await prepareStripePayment(paymentPanelEl, data, payload);
           return;
         }
@@ -1950,9 +2178,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         setReserveStatus(statusEl, 'Booking service is not reachable. Manual fallback is available for testing.', 'warn');
       } finally {
         progress.stop();
-        if (buttonEl) {
+        if (buttonEl && !keepPostCartState) {
           buttonEl.disabled = false;
           buttonEl.textContent = 'Reserve this court';
+          buttonEl.hidden = false;
         }
       }
     }
@@ -2354,18 +2583,18 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
         <button class="btn btn-primary" id="reserveBtn">Reserve this court</button>
         <div class="reserve-status" id="reserveStatus" hidden></div>
-        <div class="payment-panel" id="paymentPanel" hidden>
+        <div class="payment-panel" id="paymentPanel" hidden aria-live="polite">
           <div class="payment-head">
-            <span>Secure payment</span>
+            <span>Confirm booking</span>
             <strong class="payment-amount" id="paymentAmount">$--</strong>
           </div>
           <div class="payment-element" id="paymentElement"></div>
           <p class="booking-disclosure">
-            Your court is booked through Arlington County Parks & Recreation/WebTrac. Arlington's confirmation,
-            cancellation, refund, facility, and surcharge policies apply; cancellation or adjustment requests
-            should be handled with Arlington DPR/Facilities Scheduling.
+            Your court is in the Arlington WebTrac cart. Confirm payment to finish the booking.
+            Arlington County Parks & Recreation/WebTrac will be the official booking system;
+            Arlington's cancellation, refund, facility, and surcharge policies apply.
           </p>
-          <button class="btn btn-primary" id="payBtn" type="button">Pay with Apple Pay / Card</button>
+          <button class="btn btn-primary" id="payBtn" type="button">Confirm booking / pay</button>
           <div class="payment-status" id="paymentStatus"></div>
         </div>
         <a class="btn btn-secondary" id="manualWebtracBtn"
@@ -2419,6 +2648,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         const resetReserveFeedback = () => {
           if (reserveStatusEl) reserveStatusEl.hidden = true;
           if (paymentPanelEl) paymentPanelEl.hidden = true;
+          activeStripePayment = null;
+          if (reserveBtn) {
+            reserveBtn.hidden = false;
+            reserveBtn.disabled = false;
+            reserveBtn.textContent = 'Reserve this court';
+          }
           if (manualFallbackEl) {
             manualFallbackEl.href = webtracUrl(court.code);
             manualFallbackEl.hidden = true;
@@ -2726,10 +2961,22 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
         <div class="module">
           <div class="module-label">Buy us a coffee</div>
-          <p>Like what we're building? A coffee helps keep the work going.</p>
-          <!-- TODO: replace href below with the real Buy Me a Coffee URL once set up,
-               then drop the ?view=coming-soon placeholder. -->
-          <a class="btn btn-ghost" href="?view=coming-soon&cat=buy-us-coffee" data-cta-id="wwu-coffee">Buy us a coffee</a>
+          <p>Like what we're building? Any amount is appreciated. Five dollars starts the tab.</p>
+          <div class="support-amounts" role="group" aria-label="Support amount">
+            <button class="support-amount active" type="button" data-amount="500">$5</button>
+            <button class="support-amount" type="button" data-amount="1000">$10</button>
+            <button class="support-amount" type="button" data-amount="2000">$20</button>
+          </div>
+          <label class="support-custom">
+            <span>Custom</span>
+            <input id="supportCustomAmount" type="number" min="1" step="1" inputmode="decimal" placeholder="Amount">
+          </label>
+          <button class="btn btn-ghost" id="supportStartBtn" type="button" data-cta-id="wwu-coffee">Continue with $5.00</button>
+          <div class="support-payment" id="supportPaymentPanel" hidden>
+            <div class="payment-element" id="supportPaymentElement" hidden></div>
+            <button class="btn btn-primary" id="supportPayBtn" type="button" hidden>Pay $5.00</button>
+            <div class="payment-status" id="supportPaymentStatus"></div>
+          </div>
         </div>
 
         <div class="module">
@@ -2746,6 +2993,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         <button class="btn btn-secondary" id="homeBtn" style="margin-top: 4px;">Back to start</button>
       `;
       document.getElementById('homeBtn').addEventListener('click', () => { location.href = location.pathname; });
+      wireSupportPaymentModule();
       wireNotifyForm();
       wireBackLink();
     }
