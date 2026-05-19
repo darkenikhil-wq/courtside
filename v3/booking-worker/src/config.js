@@ -4,6 +4,7 @@ const browserlessToken = process.env.BROWSERLESS_TOKEN || '';
 const browserlessRegion = process.env.BROWSERLESS_REGION || 'sfo';
 const browserlessStealth = process.env.BROWSERLESS_STEALTH !== 'false';
 const browserlessRoute = process.env.BROWSERLESS_ROUTE || (browserlessStealth ? 'stealth' : 'chrome');
+const browserlessProxyEnabled = process.env.BROWSERLESS_PROXY_ENABLED === 'true';
 const browserlessProxy = process.env.BROWSERLESS_PROXY || '';
 const browserlessProxyCountry = process.env.BROWSERLESS_PROXY_COUNTRY || '';
 const browserlessProxyCity = process.env.BROWSERLESS_PROXY_CITY || '';
@@ -28,6 +29,7 @@ export const config = {
   browserConnectMode: (process.env.PLAYWRIGHT_CONNECT_MODE || 'cdp').toLowerCase(),
   browserConnectTimeoutMs: Number(process.env.PLAYWRIGHT_CONNECT_TIMEOUT_MS || 60000),
   browserConnectAttempts: Number(process.env.PLAYWRIGHT_CONNECT_ATTEMPTS || 3),
+  browserlessProxyEnabled,
   browserRuntimeLabel: explicitBrowserEndpoint
     ? 'remote:custom'
     : browserlessToken
@@ -60,11 +62,13 @@ function browserlessEndpoint() {
   if (Number.isFinite(browserlessTimeoutSeconds) && browserlessTimeoutSeconds > 0) {
     params.set('timeout', String(browserlessTimeoutSeconds));
   }
-  addBrowserlessParam(params, 'proxy', browserlessProxy);
-  addBrowserlessParam(params, 'proxyCountry', browserlessProxyCountry);
-  addBrowserlessParam(params, 'proxyCity', browserlessProxyCity);
-  addBrowserlessParam(params, 'proxySticky', browserlessProxySticky);
-  addBrowserlessParam(params, 'proxyPreset', browserlessProxyPreset);
+  if (browserlessProxyEnabled) {
+    addBrowserlessParam(params, 'proxy', browserlessProxy);
+    addBrowserlessParam(params, 'proxyCountry', browserlessProxyCountry);
+    addBrowserlessParam(params, 'proxyCity', browserlessProxyCity);
+    addBrowserlessParam(params, 'proxySticky', browserlessProxySticky);
+    addBrowserlessParam(params, 'proxyPreset', browserlessProxyPreset);
+  }
   return `wss://production-${browserlessRegion}.browserless.io/${route}?${params.toString()}`;
 }
 

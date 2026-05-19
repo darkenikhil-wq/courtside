@@ -29,8 +29,9 @@ app.get('/health', (req, res) => {
     browserConnectMode: config.browserConnectMode,
     browserConnectAttempts: config.browserConnectAttempts,
     browserlessTimeoutSeconds: config.browserlessTimeoutSeconds,
+    browserlessProxyEnabled: config.browserlessProxyEnabled,
     reserveJobStore: RESERVE_JOB_STORE_DIR,
-    workerBuild: 'browserless-connect-retry-v1',
+    workerBuild: 'browserless-proxy-opt-in-v1',
   });
 });
 

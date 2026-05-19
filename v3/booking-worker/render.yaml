@@ -46,14 +46,16 @@ services:
         value: stealth
       - key: BROWSERLESS_STEALTH
         value: true
+      - key: BROWSERLESS_PROXY_ENABLED
+        value: false
       - key: BROWSERLESS_PROXY
-        value: residential
+        value: ""
       - key: BROWSERLESS_PROXY_COUNTRY
-        value: us
+        value: ""
       - key: BROWSERLESS_PROXY_STICKY
-        value: true
+        value: ""
       - key: BROWSERLESS_PROXY_PRESET
-        value: px_gov01
+        value: ""
       - key: WEBTRAC_BILL_FIRST_NAME
         sync: false
       - key: WEBTRAC_BILL_LAST_NAME
