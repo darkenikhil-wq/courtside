@@ -9,6 +9,7 @@ const browserlessProxyCountry = process.env.BROWSERLESS_PROXY_COUNTRY || '';
 const browserlessProxyCity = process.env.BROWSERLESS_PROXY_CITY || '';
 const browserlessProxySticky = process.env.BROWSERLESS_PROXY_STICKY || '';
 const browserlessProxyPreset = process.env.BROWSERLESS_PROXY_PRESET || '';
+const browserlessTimeoutMs = Number(process.env.BROWSERLESS_TIMEOUT_MS || 300000);
 const explicitBrowserEndpoint = process.env.PLAYWRIGHT_WS_ENDPOINT || process.env.BROWSER_WS_ENDPOINT || '';
 
 export const config = {
@@ -29,6 +30,7 @@ export const config = {
       ? `remote:browserless:${browserlessStealth ? 'stealth' : 'standard'}`
       : 'local',
   artifactDir: process.env.PLAYWRIGHT_ARTIFACT_DIR || new URL('../.playwright-artifacts', import.meta.url).pathname,
+  reserveJobStoreDir: process.env.RESERVE_JOB_STORE_DIR || '/tmp/courtside-reserve-jobs',
   clearCartBeforeReserve: process.env.WEBTRAC_CLEAR_CART_BEFORE_RESERVE !== 'false',
   allowWebtracFinalPayment: process.env.ALLOW_WEBTRAC_FINAL_PAYMENT === 'true',
   recaptchaWaitMs: Number(process.env.WEBTRAC_RECAPTCHA_WAIT_MS || 120000),
@@ -50,6 +52,9 @@ function browserlessEndpoint() {
   if (!browserlessToken) return '';
   const route = normalizeBrowserlessRoute(browserlessRoute);
   const params = new URLSearchParams({ token: browserlessToken });
+  if (Number.isFinite(browserlessTimeoutMs) && browserlessTimeoutMs > 0) {
+    params.set('timeout', String(browserlessTimeoutMs));
+  }
   addBrowserlessParam(params, 'proxy', browserlessProxy);
   addBrowserlessParam(params, 'proxyCountry', browserlessProxyCountry);
   addBrowserlessParam(params, 'proxyCity', browserlessProxyCity);

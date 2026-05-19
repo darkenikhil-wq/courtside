@@ -16,10 +16,14 @@ services:
         value: false
       - key: PLAYWRIGHT_ARTIFACT_DIR
         value: /tmp/courtside-playwright
+      - key: RESERVE_JOB_STORE_DIR
+        value: /tmp/courtside-reserve-jobs
       - key: PLAYWRIGHT_CONNECT_MODE
         value: cdp
       - key: PLAYWRIGHT_CONNECT_TIMEOUT_MS
         value: 60000
+      - key: BROWSERLESS_TIMEOUT_MS
+        value: 300000
       - key: WEBTRAC_CLEAR_CART_BEFORE_RESERVE
         value: true
       - key: ALLOW_WEBTRAC_FINAL_PAYMENT

@@ -9,7 +9,7 @@ import { finalizeWebtracCheckout, inspectCheckoutFlow, reserveWithWebtrac } from
 const app = express();
 const reserveJobs = new Map();
 const RESERVE_JOB_TTL_MS = 30 * 60 * 1000;
-const RESERVE_JOB_STORE_DIR = path.join(config.artifactDir, 'reserve-jobs');
+const RESERVE_JOB_STORE_DIR = config.reserveJobStoreDir;
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
@@ -27,7 +27,8 @@ app.get('/health', (req, res) => {
     browserProfile: 'browser-like-v1',
     browserRuntime: config.browserRuntimeLabel,
     browserConnectMode: config.browserConnectMode,
-    workerBuild: 'durable-reserve-jobs-v1',
+    reserveJobStore: RESERVE_JOB_STORE_DIR,
+    workerBuild: 'live-cart-resilience-v1',
   });
 });
 
