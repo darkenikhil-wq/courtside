@@ -664,7 +664,19 @@ async function inspectPaymentEntryPage(page) {
       hasSecurityCodeField: /security\s*code|cvv|cvc|cid|cc-csc/i.test(combinedText),
       hasSubmitPaymentAction: /submit\s+payment|make\s+payment|process\s+payment|complete\s+(order|transaction)|place\s+order|purchase/i.test(combinedText),
     },
-    frames,
+    frames: frames.map(redactPaymentFrameForOutput),
+  };
+}
+
+function redactPaymentFrameForOutput(frame) {
+  return {
+    ...frame,
+    details: {
+      ...frame.details,
+      textSnippet: frame.details.textSnippet
+        ? '[redacted page text; field/control metadata retained]'
+        : '',
+    },
   };
 }
 
