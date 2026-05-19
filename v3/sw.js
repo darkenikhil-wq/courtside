@@ -11,7 +11,7 @@
  *   - anything cross-origin (Google Fonts CSS still hits network)
  */
 
-const CACHE_VERSION = 'courtside-v8-v3';
+const CACHE_VERSION = 'courtside-v9-v3';
 const APP_SHELL = [
   '/',
   '/index.html',
@@ -56,6 +56,16 @@ self.addEventListener('fetch', (event) => {
 
   // Skip the dashboard route entirely so admin pages always reflect live counts.
   if (url.searchParams.has('view') && url.searchParams.get('view') === 'dashboard') return;
+
+  const isDocument = req.mode === 'navigate' || url.pathname === '/' || url.pathname === '/index.html';
+  if (isDocument) {
+    event.respondWith(
+      fetch(req, { cache: 'no-store' }).catch(() => {
+        return caches.match('/').then((m) => m || caches.match('/index.html'));
+      })
+    );
+    return;
+  }
 
   event.respondWith(
     caches.match(req).then((cached) => {
