@@ -385,6 +385,19 @@ async function login(page) {
     };
     attempts.push(loginAttempt);
 
+    if (loginAttempt.cloudflareBlocked && await waitForCloudflareClearance(page)) {
+      const clearedBodyText = await page.locator('body').innerText({ timeout: 5000 }).catch(() => '');
+      const clearedTitle = await page.title().catch(() => '');
+      Object.assign(loginAttempt, {
+        landedUrl: page.url(),
+        title: clearedTitle,
+        authState: authStateFromText(clearedBodyText),
+        cloudflareBlocked: isCloudflareBlocked(clearedBodyText, clearedTitle),
+        snippet: clearedBodyText.replace(/\s+/g, ' ').slice(0, 360),
+        clearanceWaited: true,
+      });
+    }
+
     if (loginAttempt.authState === 'signed_in') return;
     if (loginAttempt.cloudflareBlocked) {
       throw codedError(
@@ -428,6 +441,18 @@ async function login(page) {
     `Could not find a WebTrac login form. Last attempted: ${lastUrl}`,
     { loginAttempts: attempts }
   );
+}
+
+async function waitForCloudflareClearance(page) {
+  const started = Date.now();
+  while (Date.now() - started < 45000) {
+    await page.waitForTimeout(2500);
+    await page.waitForLoadState('domcontentloaded', { timeout: 5000 }).catch(() => {});
+    const bodyText = await page.locator('body').innerText({ timeout: 5000 }).catch(() => '');
+    const title = await page.title().catch(() => '');
+    if (!isCloudflareBlocked(bodyText, title)) return true;
+  }
+  return false;
 }
 
 function firstVisible(page, selectors) {
