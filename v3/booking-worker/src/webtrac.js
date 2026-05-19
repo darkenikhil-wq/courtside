@@ -409,6 +409,8 @@ async function createBrowserContext(browser) {
       'Accept-Language': 'en-US,en;q=0.9',
     },
   };
+  const storageState = await readWebtracStorageState();
+  if (storageState) contextOptions.storageState = storageState;
 
   try {
     return await browser.newContext(contextOptions);
@@ -453,7 +455,10 @@ async function login(page) {
       });
     }
 
-    if (loginAttempt.authState === 'signed_in') return;
+    if (loginAttempt.authState === 'signed_in') {
+      await persistWebtracStorageState(page.context());
+      return;
+    }
     if (loginAttempt.cloudflareBlocked) {
       throw codedError(
         'WEBTRAC_ACCESS_BLOCKED',
@@ -479,6 +484,7 @@ async function login(page) {
       await handleActiveSessionPrompt(page);
       await waitForLoginSettle(page);
       await assertLoggedIn(page, attempts);
+      await persistWebtracStorageState(page.context());
       return;
     }
   }
@@ -488,6 +494,28 @@ async function login(page) {
     `Could not find a WebTrac login form. Last attempted: ${lastUrl}`,
     { loginAttempts: attempts }
   );
+}
+
+async function readWebtracStorageState() {
+  if (!config.webtracStorageStatePath) return null;
+  try {
+    const raw = await fs.readFile(config.webtracStorageStatePath, 'utf8');
+    const parsed = JSON.parse(raw);
+    if (!parsed || !Array.isArray(parsed.cookies)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+async function persistWebtracStorageState(context) {
+  if (!config.webtracStorageStatePath) return;
+  try {
+    await fs.mkdir(new URL('.', `file://${config.webtracStorageStatePath}`).pathname, { recursive: true });
+    await context.storageState({ path: config.webtracStorageStatePath });
+  } catch (e) {
+    console.warn('[webtrac:storage_state_failed]', { message: e.message || String(e) });
+  }
 }
 
 async function waitForCloudflareClearance(page) {
