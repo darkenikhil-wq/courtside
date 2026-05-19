@@ -435,26 +435,16 @@ async function login(page) {
       );
     }
 
-    const username = firstVisible(page, [
-      'input[name="username"]',
-      'input[name="Username"]',
-      'input[name="user"]',
-      'input[name="login"]',
-      'input[id*="user" i]',
-      'input[id*="email" i]',
-      'input[type="email"]',
-      'input[type="text"]',
-    ]);
     const password = firstVisible(page, [
       'input[name="password"]',
       'input[name="Password"]',
       'input[id*="pass" i]',
       'input[type="password"]',
     ]);
+    const username = await findUsernameForPassword(page, password);
 
     if (await username.count() && await password.count()) {
-      await username.first().fill(config.webtracUsername);
-      await password.first().fill(config.webtracPassword);
+      loginAttempt.formFill = await fillLoginFields(username.first(), password.first());
       await clickLogin(page);
       await waitForLoginSettle(page);
       await handleActiveSessionPrompt(page);
@@ -485,6 +475,66 @@ async function waitForCloudflareClearance(page) {
 
 function firstVisible(page, selectors) {
   return page.locator(selectors.join(', ')).filter({ visible: true });
+}
+
+async function findUsernameForPassword(page, passwordLocator) {
+  if (!await passwordLocator.count()) return page.locator('__missing_login_username__');
+  const password = passwordLocator.first();
+  const usernameSelectors = [
+    'input[name="username"]',
+    'input[name="Username"]',
+    'input[name="user"]',
+    'input[name="login"]',
+    'input[id*="user" i]',
+    'input[id*="email" i]',
+    'input[type="email"]',
+    'input[type="text"]',
+  ].join(', ');
+
+  const sameForm = page.locator('form').filter({ has: password }).first();
+  if (await sameForm.count()) {
+    const inForm = sameForm.locator(usernameSelectors).filter({ visible: true });
+    if (await inForm.count()) return inForm;
+  }
+
+  const sameLoginBlock = page.locator('section, main, div, article').filter({ has: password }).locator(usernameSelectors).filter({ visible: true });
+  if (await sameLoginBlock.count()) return sameLoginBlock;
+
+  return firstVisible(page, usernameSelectors.split(', '));
+}
+
+async function fillLoginFields(username, password) {
+  await username.click({ timeout: 5000 }).catch(() => {});
+  await username.press(process.platform === 'darwin' ? 'Meta+A' : 'Control+A').catch(() => {});
+  await username.fill(config.webtracUsername);
+  await password.click({ timeout: 5000 }).catch(() => {});
+  await password.press(process.platform === 'darwin' ? 'Meta+A' : 'Control+A').catch(() => {});
+  await password.fill(config.webtracPassword);
+
+  const [usernameField, passwordField] = await Promise.all([
+    inputFillDiagnostic(username, config.webtracUsername.length),
+    inputFillDiagnostic(password, config.webtracPassword.length),
+  ]);
+
+  return { usernameField, passwordField };
+}
+
+async function inputFillDiagnostic(locator, expectedLength) {
+  return locator.evaluate((input, expected) => ({
+    type: input.getAttribute('type') || '',
+    name: input.getAttribute('name') || '',
+    id: input.getAttribute('id') || '',
+    autocomplete: input.getAttribute('autocomplete') || '',
+    placeholder: input.getAttribute('placeholder') || '',
+    expectedLength: expected,
+    actualLength: input.value ? input.value.length : 0,
+    filled: Boolean(input.value) && input.value.length === expected,
+  }), expectedLength).catch((error) => ({
+    expectedLength,
+    actualLength: null,
+    filled: false,
+    error: error.message,
+  }));
 }
 
 async function clickLogin(page) {
