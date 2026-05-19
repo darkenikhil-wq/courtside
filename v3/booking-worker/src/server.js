@@ -26,12 +26,14 @@ app.get('/health', (req, res) => {
     headless: config.headless,
     browserProfile: 'browser-like-v1',
     browserRuntime: config.browserRuntimeLabel,
+    remoteBrowserEnabled: config.remoteBrowserEnabled,
+    browserlessEnabled: config.browserlessEnabled,
     browserConnectMode: config.browserConnectMode,
     browserConnectAttempts: config.browserConnectAttempts,
     browserlessTimeoutSeconds: config.browserlessTimeoutSeconds,
     browserlessProxyEnabled: config.browserlessProxyEnabled,
     reserveJobStore: RESERVE_JOB_STORE_DIR,
-    workerBuild: 'browserless-standard-chrome-v1',
+    workerBuild: 'render-local-chromium-v1',
   });
 });
 

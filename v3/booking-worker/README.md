@@ -133,16 +133,19 @@ For Render:
 5. Keep `ALLOW_WEBTRAC_FINAL_PAYMENT=false` until cart matching and payment
    filling have been tested from the cloud worker.
 
-Cloud default is `HEADLESS=true`. If WebTrac presents reCAPTCHA, the worker will
-stop before final payment with `WEBTRAC_RECAPTCHA_REQUIRED`; do not try to bypass
-it. A production-grade version may need a hosted browser with a live operator
-view if WebTrac requires interactive verification.
+Cloud default is `HEADLESS=true`. The Docker image runs Chromium inside the
+Render worker, so Browserless/local Mac disk space is not part of the normal
+booking path. If WebTrac presents reCAPTCHA, the worker will stop before final
+payment with `WEBTRAC_RECAPTCHA_REQUIRED`; do not try to bypass it. A
+production-grade version may need a hosted browser with a live operator view if
+WebTrac requires interactive verification.
 
 If WebTrac/Cloudflare blocks the Render browser before the login page loads,
-keep the Netlify app pointed at this worker but move the browser itself to a
-managed hosted-browser endpoint:
+keep the Netlify app pointed at this worker but explicitly opt into a managed
+hosted-browser endpoint:
 
 ```text
+REMOTE_BROWSER_ENABLED=true
 PLAYWRIGHT_WS_ENDPOINT=wss://<hosted-browser-endpoint>
 PLAYWRIGHT_CONNECT_MODE=cdp
 PLAYWRIGHT_CONNECT_TIMEOUT_MS=60000
@@ -153,20 +156,23 @@ Chromium/IP profile, which is the part WebTrac is currently rejecting.
 
 For Browserless, you can either paste the full WebSocket URL into
 `PLAYWRIGHT_WS_ENDPOINT`, or set the shortcut vars and let the worker build the
-stealth endpoint:
+standard Chrome endpoint:
 
 ```text
+REMOTE_BROWSER_ENABLED=true
+BROWSERLESS_ENABLED=true
 BROWSERLESS_TOKEN=<browserless-api-token>
 BROWSERLESS_REGION=sfo
-BROWSERLESS_ROUTE=stealth
-BROWSERLESS_STEALTH=true
+BROWSERLESS_ROUTE=chrome
+BROWSERLESS_STEALTH=false
 PLAYWRIGHT_CONNECT_MODE=cdp
 ```
 
-If WebTrac blocks the hosted browser's datacenter IP, enable Browserless'
-residential proxy and keep the IP sticky for the whole reservation attempt:
+If WebTrac blocks the hosted browser's datacenter IP and your Browserless plan
+supports it, enable Browserless' proxy settings deliberately:
 
 ```text
+BROWSERLESS_PROXY_ENABLED=true
 BROWSERLESS_PROXY=residential
 BROWSERLESS_PROXY_COUNTRY=us
 BROWSERLESS_PROXY_STICKY=true

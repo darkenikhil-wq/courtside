@@ -18,6 +18,8 @@ services:
         value: /tmp/courtside-playwright
       - key: RESERVE_JOB_STORE_DIR
         value: /tmp/courtside-reserve-jobs
+      - key: REMOTE_BROWSER_ENABLED
+        value: false
       - key: PLAYWRIGHT_CONNECT_MODE
         value: cdp
       - key: PLAYWRIGHT_CONNECT_TIMEOUT_MS
@@ -40,6 +42,8 @@ services:
         sync: false
       - key: BROWSERLESS_TOKEN
         sync: false
+      - key: BROWSERLESS_ENABLED
+        value: false
       - key: BROWSERLESS_REGION
         value: sfo
       - key: BROWSERLESS_ROUTE

@@ -10,11 +10,15 @@ const browserlessProxyCountry = process.env.BROWSERLESS_PROXY_COUNTRY || '';
 const browserlessProxyCity = process.env.BROWSERLESS_PROXY_CITY || '';
 const browserlessProxySticky = process.env.BROWSERLESS_PROXY_STICKY || '';
 const browserlessProxyPreset = process.env.BROWSERLESS_PROXY_PRESET || '';
+const remoteBrowserEnabled = process.env.REMOTE_BROWSER_ENABLED === 'true';
+const browserlessEnabled = remoteBrowserEnabled && process.env.BROWSERLESS_ENABLED === 'true';
 const browserlessTimeoutSeconds = normalizeBrowserlessTimeoutSeconds(
   process.env.BROWSERLESS_TIMEOUT_SECONDS,
   process.env.BROWSERLESS_TIMEOUT_MS,
 );
-const explicitBrowserEndpoint = process.env.PLAYWRIGHT_WS_ENDPOINT || process.env.BROWSER_WS_ENDPOINT || '';
+const explicitBrowserEndpoint = remoteBrowserEnabled
+  ? process.env.PLAYWRIGHT_WS_ENDPOINT || process.env.BROWSER_WS_ENDPOINT || ''
+  : '';
 
 export const config = {
   port: Number(process.env.PORT || 8787),
@@ -25,14 +29,16 @@ export const config = {
   headless: process.env.HEADLESS !== 'false',
   slowMo: Number(process.env.SLOW_MO_MS || 0),
   chromeExecutablePath: process.env.CHROME_EXECUTABLE_PATH || '',
-  browserWsEndpoint: explicitBrowserEndpoint || browserlessEndpoint(),
+  remoteBrowserEnabled,
+  browserlessEnabled,
+  browserWsEndpoint: explicitBrowserEndpoint || (browserlessEnabled ? browserlessEndpoint() : ''),
   browserConnectMode: (process.env.PLAYWRIGHT_CONNECT_MODE || 'cdp').toLowerCase(),
   browserConnectTimeoutMs: Number(process.env.PLAYWRIGHT_CONNECT_TIMEOUT_MS || 60000),
   browserConnectAttempts: Number(process.env.PLAYWRIGHT_CONNECT_ATTEMPTS || 3),
   browserlessProxyEnabled,
   browserRuntimeLabel: explicitBrowserEndpoint
     ? 'remote:custom'
-    : browserlessToken
+    : browserlessEnabled && browserlessToken
       ? `remote:browserless:${browserlessStealth ? 'stealth' : 'standard'}`
       : 'local',
   browserlessTimeoutSeconds,
@@ -56,7 +62,7 @@ export const config = {
 };
 
 function browserlessEndpoint() {
-  if (!browserlessToken) return '';
+  if (!browserlessEnabled || !browserlessToken) return '';
   const route = normalizeBrowserlessRoute(browserlessRoute);
   const params = new URLSearchParams({ token: browserlessToken });
   if (Number.isFinite(browserlessTimeoutSeconds) && browserlessTimeoutSeconds > 0) {
