@@ -4,6 +4,8 @@ import { assertPaymentConfig, config } from './config.js';
 
 const WEBTRAC_ORIGIN = 'https://vaarlingtonweb.myvscloud.com';
 const SEARCH_PATH = '/webtrac/web/search.html';
+const BROWSER_USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36';
+const BROWSER_VIEWPORT = { width: 1280, height: 900 };
 const LOGIN_CANDIDATES = [
   '/webtrac/web/login.html',
   '/webtrac/web/householdlogin.html',
@@ -11,18 +13,7 @@ const LOGIN_CANDIDATES = [
 ];
 
 export async function reserveWithWebtrac(payload) {
-  await resetArtifactDir();
-  const browser = await chromium.launch({
-    headless: config.headless,
-    slowMo: config.slowMo,
-    executablePath: config.chromeExecutablePath || undefined,
-    artifactsPath: config.artifactDir,
-  });
-  const context = await browser.newContext({
-    viewport: { width: 1280, height: 900 },
-    userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
-  });
-  const page = await context.newPage();
+  const { browser, context, page } = await createBrowserSession();
 
   try {
     await login(page);
@@ -112,18 +103,7 @@ export async function reserveWithWebtrac(payload) {
 }
 
 export async function inspectCheckoutFlow(options = {}) {
-  await resetArtifactDir();
-  const browser = await chromium.launch({
-    headless: config.headless,
-    slowMo: config.slowMo,
-    executablePath: config.chromeExecutablePath || undefined,
-    artifactsPath: config.artifactDir,
-  });
-  const context = await browser.newContext({
-    viewport: { width: 1280, height: 900 },
-    userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
-  });
-  const page = await context.newPage();
+  const { browser, context, page } = await createBrowserSession();
 
   try {
     await login(page);
@@ -179,18 +159,7 @@ export async function inspectCheckoutFlow(options = {}) {
 }
 
 export async function finalizeWebtracCheckout(options = {}) {
-  await resetArtifactDir();
-  const browser = await chromium.launch({
-    headless: config.headless,
-    slowMo: config.slowMo,
-    executablePath: config.chromeExecutablePath || undefined,
-    artifactsPath: config.artifactDir,
-  });
-  const context = await browser.newContext({
-    viewport: { width: 1280, height: 900 },
-    userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
-  });
-  const page = await context.newPage();
+  const { browser, context, page } = await createBrowserSession();
 
   try {
     await login(page);
@@ -339,6 +308,63 @@ async function resetArtifactDir() {
   await fs.mkdir(config.artifactDir, { recursive: true });
 }
 
+async function createBrowserSession() {
+  await resetArtifactDir();
+  const browser = await chromium.launch({
+    headless: config.headless,
+    slowMo: config.slowMo,
+    executablePath: config.chromeExecutablePath || undefined,
+    artifactsPath: config.artifactDir,
+    args: [
+      '--disable-blink-features=AutomationControlled',
+      '--disable-dev-shm-usage',
+      '--disable-setuid-sandbox',
+      '--no-sandbox',
+      `--window-size=${BROWSER_VIEWPORT.width},${BROWSER_VIEWPORT.height}`,
+    ],
+  });
+  const context = await browser.newContext({
+    viewport: BROWSER_VIEWPORT,
+    screen: BROWSER_VIEWPORT,
+    deviceScaleFactor: 1,
+    hasTouch: false,
+    isMobile: false,
+    locale: 'en-US',
+    timezoneId: 'America/New_York',
+    userAgent: BROWSER_USER_AGENT,
+    extraHTTPHeaders: {
+      'Accept-Language': 'en-US,en;q=0.9',
+    },
+  });
+
+  await context.addInitScript(() => {
+    const defineGetter = (target, property, getter) => {
+      try {
+        Object.defineProperty(target, property, { get: getter, configurable: true });
+      } catch (e) {}
+    };
+
+    defineGetter(navigator, 'webdriver', () => undefined);
+    defineGetter(navigator, 'languages', () => ['en-US', 'en']);
+    defineGetter(navigator, 'plugins', () => [1, 2, 3, 4, 5]);
+
+    window.chrome = window.chrome || {};
+    window.chrome.runtime = window.chrome.runtime || {};
+
+    const originalQuery = window.navigator.permissions?.query?.bind(window.navigator.permissions);
+    if (originalQuery) {
+      window.navigator.permissions.query = (parameters) => (
+        parameters?.name === 'notifications'
+          ? Promise.resolve({ state: window.Notification?.permission || 'default' })
+          : originalQuery(parameters)
+      );
+    }
+  });
+
+  const page = await context.newPage();
+  return { browser, context, page };
+}
+
 async function login(page) {
   let lastUrl = null;
   const attempts = [];
@@ -392,7 +418,7 @@ async function login(page) {
       await waitForLoginSettle(page);
       await handleActiveSessionPrompt(page);
       await waitForLoginSettle(page);
-      await assertLoggedIn(page);
+      await assertLoggedIn(page, attempts);
       return;
     }
   }
@@ -450,9 +476,10 @@ async function waitForLoginSettle(page) {
   }
 }
 
-async function assertLoggedIn(page) {
+async function assertLoggedIn(page, loginAttempts = []) {
   const bodyText = await page.locator('body').innerText({ timeout: 5000 }).catch(() => '');
   const diagnostics = await loginPageDiagnostics(page, bodyText);
+  diagnostics.loginAttempts = loginAttempts;
   if (diagnostics.cloudflareBlocked) {
     throw codedError(
       'WEBTRAC_ACCESS_BLOCKED',

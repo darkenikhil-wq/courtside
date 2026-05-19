@@ -21,6 +21,7 @@ app.get('/health', (req, res) => {
     ok: true,
     dryRun: config.dryRun,
     headless: config.headless,
+    browserProfile: 'browser-like-v1',
   });
 });
 
