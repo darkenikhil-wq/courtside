@@ -11,7 +11,7 @@
  *   - anything cross-origin (Google Fonts CSS still hits network)
  */
 
-const CACHE_VERSION = 'courtside-v7-v3';
+const CACHE_VERSION = 'courtside-v8-v3';
 const APP_SHELL = [
   '/',
   '/index.html',

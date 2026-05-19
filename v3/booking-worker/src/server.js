@@ -1,7 +1,7 @@
 import express from 'express';
 import { config, assertRuntimeConfig } from './config.js';
 import { validateBookingRequest } from './validation.js';
-import { inspectCheckoutFlow, reserveWithWebtrac } from './webtrac.js';
+import { finalizeWebtracCheckout, inspectCheckoutFlow, reserveWithWebtrac } from './webtrac.js';
 
 const app = express();
 app.use((req, res, next) => {
@@ -95,6 +95,42 @@ app.post('/checkout/inspect', async (req, res) => {
     res.status(e.code === 'MISSING_ENV' ? 500 : 502).json({
       status: 'worker_error',
       code: e.code || 'WEBTRAC_CHECKOUT_INSPECTION_ERROR',
+      message: e.message || String(e),
+      missing: e.missing,
+    });
+  }
+});
+
+app.post('/checkout/finalize', async (req, res) => {
+  if (!isAuthorized(req)) {
+    return res.status(401).json({
+      status: 'rejected',
+      code: 'UNAUTHORIZED',
+      message: 'Missing or invalid booking worker token.',
+    });
+  }
+
+  try {
+    assertRuntimeConfig();
+    const result = await finalizeWebtracCheckout(req.body || {});
+    console.log('[checkout:finalize]', {
+      status: result.status,
+      code: result.code,
+      allowWebtracFinalPayment: config.allowWebtracFinalPayment,
+      fill: result.fillResult,
+      recaptcha: result.recaptcha,
+      confirmation: result.confirmation && {
+        confirmed: result.confirmation.confirmed,
+        confirmationId: result.confirmation.confirmationId,
+        hasErrorText: result.confirmation.hasErrorText,
+      },
+    });
+    const statusCode = result.status === 'webtrac_confirmed' || result.status === 'webtrac_payment_ready' ? 200 : 502;
+    res.status(statusCode).json(result);
+  } catch (e) {
+    res.status(e.code === 'MISSING_ENV' || e.code === 'MISSING_PAYMENT_ENV' ? 500 : 502).json({
+      status: 'worker_error',
+      code: e.code || 'WEBTRAC_FINALIZE_ERROR',
       message: e.message || String(e),
       missing: e.missing,
     });

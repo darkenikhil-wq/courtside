@@ -1,5 +1,5 @@
 import fs from 'node:fs';
-import { config, requiredEnvStatus } from './config.js';
+import { config, paymentEnvStatus, requiredEnvStatus } from './config.js';
 
 const envUrl = new URL('../.env', import.meta.url);
 const envText = fs.existsSync(envUrl) ? fs.readFileSync(envUrl, 'utf8') : '';
@@ -38,6 +38,7 @@ const checks = [
 ];
 
 const missing = checks.filter((check) => !check.ok);
+const paymentMissing = paymentEnvStatus().filter((check) => !check.ok);
 
 console.log('Courtside booking worker doctor');
 console.log('');
@@ -50,6 +51,13 @@ console.log('');
 console.log(`DRY_RUN=${config.dryRun}`);
 console.log(`HEADLESS=${config.headless}`);
 console.log(`PORT=${config.port}`);
+console.log(`ALLOW_WEBTRAC_FINAL_PAYMENT=${config.allowWebtracFinalPayment}`);
+
+if (paymentMissing.length) {
+  console.log('');
+  console.log(`Payment profile incomplete (${paymentMissing.map((item) => item.name).join(', ')}).`);
+  console.log('Reserve/cart tests can still run; final WebTrac payment cannot run until those are set.');
+}
 
 if (missing.length) {
   console.log('');

@@ -1,6 +1,6 @@
 import { chromium } from 'playwright';
 import fs from 'node:fs/promises';
-import { config } from './config.js';
+import { assertPaymentConfig, config } from './config.js';
 
 const WEBTRAC_ORIGIN = 'https://vaarlingtonweb.myvscloud.com';
 const SEARCH_PATH = '/webtrac/web/search.html';
@@ -149,6 +149,153 @@ export async function inspectCheckoutFlow(options = {}) {
       message: 'Checkout inspection reached the configured step limit before payment or final confirmation.',
       stopReason: 'step_limit',
       steps,
+    };
+  } finally {
+    await context.close().catch(() => {});
+    await browser.close().catch(() => {});
+    await resetArtifactDir().catch(() => {});
+  }
+}
+
+export async function finalizeWebtracCheckout(options = {}) {
+  await resetArtifactDir();
+  const browser = await chromium.launch({
+    headless: config.headless,
+    slowMo: config.slowMo,
+    executablePath: config.chromeExecutablePath || undefined,
+    artifactsPath: config.artifactDir,
+  });
+  const context = await browser.newContext({
+    viewport: { width: 1280, height: 900 },
+    userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+  });
+  const page = await context.newPage();
+
+  try {
+    await login(page);
+    await page.goto(WEBTRAC_ORIGIN + '/webtrac/web/cart.html', { waitUntil: 'domcontentloaded', timeout: 45000 });
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+
+    const cart = await inspectCartPage(page);
+    if (!cart.confirmed) {
+      return {
+        status: 'webtrac_finalize_failed',
+        code: 'WEBTRAC_CART_EMPTY',
+        message: 'WebTrac cart is empty, so final checkout cannot continue.',
+        cart,
+      };
+    }
+
+    const checkoutClick = await clickCheckoutInspectionNext(page);
+    if (!checkoutClick.clicked) {
+      return {
+        status: 'webtrac_finalize_failed',
+        code: 'WEBTRAC_CHECKOUT_BUTTON_NOT_FOUND',
+        message: 'Could not find the WebTrac Proceed To Checkout button.',
+        cart,
+        checkoutClick,
+      };
+    }
+
+    const checkoutState = await inspectCheckoutPaymentState(page);
+    let selected = { selected: false, skipped: true, reason: 'payment_method_not_needed' };
+    let entryContinue = { clicked: false, skipped: true, reason: 'payment_method_not_needed', url: page.url() };
+    let paymentPage = page;
+    let fillResult = { skipped: true, reason: 'no_card_entry_detected' };
+    let paymentEntry = await inspectPaymentEntryPage(paymentPage);
+
+    if (checkoutState.needsPaymentMethod) {
+      assertPaymentConfig();
+      selected = await selectPaymentMethodOption(page, /Credit Card - Web/i);
+      if (!selected.selected) {
+        return {
+          status: 'webtrac_finalize_failed',
+          code: 'WEBTRAC_CREDIT_CARD_METHOD_NOT_FOUND',
+          message: 'Could not select WebTrac Credit Card - Web payment method.',
+          cart,
+          checkoutClick: withoutPageHandle(checkoutClick),
+          checkoutState,
+          selected,
+        };
+      }
+
+      entryContinue = await clickCheckoutContinueButton(page);
+      if (!entryContinue.clicked) {
+        return {
+          status: 'webtrac_finalize_failed',
+          code: 'WEBTRAC_PAYMENT_ENTRY_NOT_REACHED',
+          message: 'Could not continue from WebTrac payment-method selection to card entry.',
+          cart,
+          checkoutClick: withoutPageHandle(checkoutClick),
+          checkoutState,
+          selected,
+          entryContinue,
+        };
+      }
+
+      paymentPage = entryContinue.page || page;
+      paymentEntry = await inspectPaymentEntryPage(paymentPage);
+    }
+
+    if (paymentEntry.markers.hasCardField || paymentEntry.markers.hasExpirationField || paymentEntry.markers.hasSecurityCodeField) {
+      assertPaymentConfig();
+      fillResult = await fillWebtracPaymentProfile(paymentPage);
+      paymentEntry = await inspectPaymentEntryPage(paymentPage);
+    }
+
+    if (!config.allowWebtracFinalPayment || options.stopBeforeSubmit) {
+      return {
+        status: 'webtrac_payment_ready',
+        code: 'WEBTRAC_PAYMENT_READY_NOT_SUBMITTED',
+        message: 'WebTrac checkout is ready, but final payment is disabled by the safety guard.',
+        requiresFinalPaymentGuard: true,
+        allowWebtracFinalPayment: config.allowWebtracFinalPayment,
+        cart,
+        checkoutClick: withoutPageHandle(checkoutClick),
+        checkoutState,
+        selected,
+        entryContinue: withoutPageHandle(entryContinue),
+        fillResult,
+        paymentEntry,
+      };
+    }
+
+    const recaptcha = await waitForRecaptchaIfPresent(paymentPage);
+    if (recaptcha.present && !recaptcha.solved) {
+      return {
+        status: 'webtrac_finalize_failed',
+        code: 'WEBTRAC_RECAPTCHA_REQUIRED',
+        message: 'WebTrac showed reCAPTCHA. Solve it in the visible browser before the worker timeout, then retry.',
+        cart,
+        checkoutClick: withoutPageHandle(checkoutClick),
+        checkoutState,
+        selected,
+        entryContinue: withoutPageHandle(entryContinue),
+        fillResult,
+        recaptcha,
+        paymentEntry,
+      };
+    }
+
+    const finalSubmit = await clickFinalWebtracContinue(paymentPage);
+    await paymentPage.waitForLoadState('networkidle', { timeout: 20000 }).catch(() => {});
+    const confirmation = await inspectFinalWebtracConfirmation(paymentPage);
+
+    return {
+      status: confirmation.confirmed ? 'webtrac_confirmed' : 'webtrac_finalize_uncertain',
+      code: confirmation.confirmed ? 'WEBTRAC_BOOKING_CONFIRMED' : 'WEBTRAC_FINALIZE_UNCERTAIN',
+      message: confirmation.confirmed
+        ? 'WebTrac appears to have confirmed the court booking.'
+        : 'WebTrac payment was submitted, but the worker could not confirm the final booking.',
+      cart,
+      checkoutClick: withoutPageHandle(checkoutClick),
+      checkoutState,
+      selected,
+      entryContinue: withoutPageHandle(entryContinue),
+      fillResult,
+      recaptcha,
+      finalSubmit,
+      confirmation,
     };
   } finally {
     await context.close().catch(() => {});
@@ -668,6 +815,30 @@ async function inspectPaymentEntryPage(page) {
   };
 }
 
+async function inspectCheckoutPaymentState(page) {
+  const text = await page.locator('body').innerText({ timeout: 10000 }).catch(() => '');
+  const compact = text.replace(/\s+/g, ' ').trim();
+  const controls = await relevantCheckoutControls(page).catch(() => []);
+  const markers = checkoutMarkers(compact, controls, page.url());
+  const amountTodayCents = parseLabeledMoneyCents(compact, /Amount To Be Paid Today/i);
+  const totalBalanceCents = parseLabeledMoneyCents(compact, /Total Balance for household/i);
+  const newChargesCents = parseLabeledMoneyCents(compact, /New Charges In Shopping Cart/i);
+  const balanceDueCents = amountTodayCents ?? totalBalanceCents ?? newChargesCents;
+
+  return {
+    url: page.url(),
+    title: await page.title().catch(() => ''),
+    markers,
+    amountTodayCents,
+    totalBalanceCents,
+    newChargesCents,
+    balanceDueCents,
+    needsPaymentMethod: balanceDueCents !== 0 && markers.hasPaymentPrompt && /select\s+a\s+payment\s+method|payment\s+method/i.test(compact),
+    appearsCoveredByCredit: [amountTodayCents, totalBalanceCents].some((amount) => amount === 0)
+      && /credit|balance|amount\s+to\s+be\s+paid\s+today/i.test(compact),
+  };
+}
+
 function redactPaymentFrameForOutput(frame) {
   return {
     ...frame,
@@ -741,6 +912,179 @@ async function inspectPaymentFrame(frame) {
     fields: [],
     controls: [],
   }));
+}
+
+async function fillWebtracPaymentProfile(page) {
+  const billing = await fillBillingFields(page);
+  const cardShell = await fillHostedPaymentShellFields(page);
+  const cardFrame = await fillBasisTheoryCardFrame(page);
+  return { billing, cardShell, cardFrame };
+}
+
+async function fillBillingFields(page) {
+  const fields = [
+    ['#webcheckout_billfirstname', config.payment.firstName],
+    ['#webcheckout_billlastname', config.payment.lastName],
+    ['#webcheckout_billphone', config.payment.phone],
+    ['#webcheckout_billemail', config.payment.email],
+    ['#webcheckout_billemail_2', config.payment.email],
+  ];
+  const filled = [];
+  const missing = [];
+  for (const [selector, value] of fields) {
+    const locator = page.locator(selector).filter({ visible: true });
+    if (!await locator.count().catch(() => 0)) {
+      missing.push(selector);
+      continue;
+    }
+    await locator.first().fill(value);
+    filled.push(selector);
+  }
+  return { filled, missing };
+}
+
+async function fillHostedPaymentShellFields(page) {
+  const values = [
+    { label: 'name_on_card', patterns: [/name\s+on\s+card/i], value: config.payment.cardName },
+    { label: 'street_address_1', patterns: [/street\s+address\s+1/i, /address\s+1/i], value: config.payment.address1 },
+    { label: 'postal_code', patterns: [/postal\s+code/i, /\bzip\b/i], value: config.payment.postalCode },
+  ];
+  return page.evaluate((items) => {
+    function visible(el) {
+      const style = window.getComputedStyle(el);
+      const rect = el.getBoundingClientRect();
+      return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0;
+    }
+
+    function contextText(el) {
+      const id = el.getAttribute('id');
+      return [
+        el.getAttribute('aria-label'),
+        el.getAttribute('placeholder'),
+        id ? document.querySelector(`label[for="${CSS.escape(id)}"]`)?.textContent : '',
+        el.closest('label, tr, li, .form-group, .field, div')?.textContent,
+      ].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+    }
+
+    const inputs = Array.from(document.querySelectorAll('input, textarea')).filter((el) => visible(el) && !el.disabled && !el.readOnly);
+    const filled = [];
+    const missing = [];
+
+    for (const item of items) {
+      const patterns = item.patterns.map((source) => new RegExp(source, 'i'));
+      const input = inputs.find((el) => patterns.some((pattern) => pattern.test(contextText(el))));
+      if (!input) {
+        missing.push(item.label);
+        continue;
+      }
+      input.value = item.value;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+      filled.push(item.label);
+    }
+
+    return { filled, missing };
+  }, values.map((item) => ({
+    label: item.label,
+    patterns: item.patterns.map((pattern) => pattern.source),
+    value: item.value,
+  })));
+}
+
+async function fillBasisTheoryCardFrame(page) {
+  const cardFrame = page.frames().find((frame) => /basis(?:theory)?\.com\/.*card-element/i.test(frame.url()));
+  if (!cardFrame) {
+    return { filled: [], missing: ['basis_theory_card_frame'] };
+  }
+
+  const fields = [
+    ['#cardNumber', config.payment.cardNumber, 'cardNumber'],
+    ['#expirationDate', config.payment.cardExp, 'expirationDate'],
+    ['#cvc', config.payment.cardCvc, 'cvc'],
+  ];
+  const filled = [];
+  const missing = [];
+  for (const [selector, value, name] of fields) {
+    const locator = cardFrame.locator(selector);
+    if (!await locator.count().catch(() => 0)) {
+      missing.push(name);
+      continue;
+    }
+    await locator.first().fill(value);
+    filled.push(name);
+  }
+
+  return { filled, missing, frameUrl: cardFrame.url() };
+}
+
+async function waitForRecaptchaIfPresent(page) {
+  const hasRecaptcha = await page.locator('iframe[src*="recaptcha"]').count().then((count) => count > 0).catch(() => false);
+  if (!hasRecaptcha) return { present: false, solved: true };
+
+  const started = Date.now();
+  while (Date.now() - started < config.recaptchaWaitMs) {
+    const solved = await page.evaluate(() => {
+      const textarea = document.querySelector('textarea[name="g-recaptcha-response"]');
+      return Boolean(textarea && textarea.value && textarea.value.length > 20);
+    }).catch(() => false);
+    if (solved) return { present: true, solved: true, waitedMs: Date.now() - started };
+    await page.waitForTimeout(1000);
+  }
+
+  return { present: true, solved: false, waitedMs: Date.now() - started };
+}
+
+async function clickFinalWebtracContinue(page) {
+  const locator = page.locator('#webcheckout_buttoncontinue').filter({ visible: true });
+  if (!await locator.count().catch(() => 0)) {
+    return { clicked: false, reason: 'final_continue_not_found', url: page.url() };
+  }
+
+  await Promise.all([
+    page.waitForLoadState('domcontentloaded', { timeout: 20000 }).catch(() => {}),
+    locator.first().click(),
+  ]);
+  await page.waitForLoadState('networkidle', { timeout: 20000 }).catch(() => {});
+  return { clicked: true, selector: '#webcheckout_buttoncontinue', label: 'Continue', url: page.url() };
+}
+
+async function inspectFinalWebtracConfirmation(page) {
+  const text = await page.locator('body').innerText({ timeout: 15000 }).catch(() => '');
+  const compact = text.replace(/\s+/g, ' ').trim();
+  const confirmationId =
+    compact.match(/(?:receipt|confirmation|transaction|order)\s*(?:number|#|id)?[:\s#]+([A-Z0-9-]{4,})/i)?.[1] || null;
+  const hasSuccessText = /thank you|receipt|confirmed|confirmation|transaction approved|payment approved|enrollment complete/i.test(compact);
+  const hasErrorText = /declined|failed|error|invalid|required|captcha|try again/i.test(compact);
+  const cartCount = Number(compact.match(/CART \((\d+) ITEMS?\)/i)?.[1] || 0);
+  return {
+    url: page.url(),
+    title: await page.title().catch(() => ''),
+    confirmed: hasSuccessText && !hasErrorText,
+    confirmationId,
+    hasSuccessText,
+    hasErrorText,
+    cartCount,
+    amountTodayCents: parseLabeledMoneyCents(compact, /Amount To Be Paid Today/i),
+    totalBalanceCents: parseLabeledMoneyCents(compact, /Total Balance for household/i),
+    pageText: compact ? '[redacted page text; confirmation markers retained]' : '',
+  };
+}
+
+function parseLabeledMoneyCents(text, labelPattern) {
+  const source = String(text || '');
+  const labelMatch = source.match(labelPattern);
+  if (!labelMatch) return null;
+  const afterLabel = source.slice(labelMatch.index + labelMatch[0].length);
+  return parseFirstMoneyCents(afterLabel);
+}
+
+function parseFirstMoneyCents(text) {
+  const match = String(text || '').match(/\$\s*([0-9,]+)(?:\.(\d{2}))?/);
+  if (!match) return null;
+  const dollars = Number(match[1].replace(/,/g, ''));
+  const cents = Number(match[2] || 0);
+  if (!Number.isFinite(dollars) || !Number.isFinite(cents)) return null;
+  return dollars * 100 + cents;
 }
 
 async function clickCheckoutInspectionNext(page) {

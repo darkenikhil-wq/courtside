@@ -76,18 +76,35 @@ and stops on the card-entry screen:
 npm run inspect:checkout
 ```
 
+To test the final checkout runner without submitting Arlington/WebTrac payment,
+fill the private payment fields in `.env` and run:
+
+```bash
+npm run finalize:checkout -- --stop-before-submit
+```
+
+Actual final WebTrac payment is guarded. It will only click the final WebTrac
+continue/payment action when all of these are true:
+
+```text
+DRY_RUN=false
+ALLOW_WEBTRAC_FINAL_PAYMENT=true
+```
+
+The v3 app now authorizes Stripe first, asks this worker to finish WebTrac, then
+captures Stripe only if WebTrac returns `webtrac_confirmed`. If WebTrac fails or
+the guard is still off, the Stripe authorization is released.
+
 ## Modes
 
 - `DRY_RUN=true`: logs in, opens the WebTrac search page, and verifies that
   Courtside supplied live selection URLs. It does not add anything to cart.
 - `DRY_RUN=false`: calls WebTrac's `UpdateSelection` endpoints from inside the
   authenticated WebTrac origin and then reloads the search page. This may add
-  slots to the WebTrac cart, but it does not finalize checkout.
+  slots to the WebTrac cart, but final checkout still requires the separate
+  `ALLOW_WEBTRAC_FINAL_PAYMENT=true` guard.
 - Keep `HEADLESS=false` for local QA. WebTrac may show bot verification to
   headless browser sessions.
-
-Do not automate final checkout/payment until we inspect the live confirmation
-step and add an explicit separate guard for it.
 
 ## Connecting v3
 
@@ -97,6 +114,21 @@ Netlify function environment variables:
 ```text
 WEBTRAC_BOOKING_ADAPTER_URL=http://localhost:8787/reserve
 WEBTRAC_BOOKING_ADAPTER_TOKEN=<same as BOOKING_WORKER_TOKEN>
+```
+
+The finalizer function derives the checkout URL from the reserve URL above. You
+can also set it explicitly:
+
+```text
+WEBTRAC_FINALIZE_ADAPTER_URL=http://localhost:8787/checkout/finalize
+WEBTRAC_FINALIZE_ADAPTER_TOKEN=<same as BOOKING_WORKER_TOKEN>
+```
+
+Stripe also needs these Netlify variables:
+
+```text
+STRIPE_PUBLISHABLE_KEY=pk_test_...
+STRIPE_SECRET_KEY=sk_test_...
 ```
 
 For deployment, use Render/Fly/Railway instead of Netlify Functions because

@@ -10,6 +10,20 @@ export const config = {
   slowMo: Number(process.env.SLOW_MO_MS || 0),
   chromeExecutablePath: process.env.CHROME_EXECUTABLE_PATH || '',
   artifactDir: process.env.PLAYWRIGHT_ARTIFACT_DIR || new URL('../.playwright-artifacts', import.meta.url).pathname,
+  allowWebtracFinalPayment: process.env.ALLOW_WEBTRAC_FINAL_PAYMENT === 'true',
+  recaptchaWaitMs: Number(process.env.WEBTRAC_RECAPTCHA_WAIT_MS || 120000),
+  payment: {
+    firstName: process.env.WEBTRAC_BILL_FIRST_NAME || '',
+    lastName: process.env.WEBTRAC_BILL_LAST_NAME || '',
+    phone: process.env.WEBTRAC_BILL_PHONE || '',
+    email: process.env.WEBTRAC_BILL_EMAIL || '',
+    cardName: process.env.WEBTRAC_CARD_NAME || '',
+    address1: process.env.WEBTRAC_BILL_ADDRESS1 || '',
+    postalCode: process.env.WEBTRAC_BILL_POSTAL_CODE || '',
+    cardNumber: process.env.WEBTRAC_CARD_NUMBER || '',
+    cardExp: process.env.WEBTRAC_CARD_EXP || '',
+    cardCvc: process.env.WEBTRAC_CARD_CVC || '',
+  },
 };
 
 export function assertRuntimeConfig() {
@@ -28,4 +42,29 @@ export function requiredEnvStatus() {
     { name: 'WEBTRAC_USERNAME', ok: Boolean(config.webtracUsername) },
     { name: 'WEBTRAC_PASSWORD', ok: Boolean(config.webtracPassword) },
   ];
+}
+
+export function paymentEnvStatus() {
+  return [
+    { name: 'WEBTRAC_BILL_FIRST_NAME', ok: Boolean(config.payment.firstName) },
+    { name: 'WEBTRAC_BILL_LAST_NAME', ok: Boolean(config.payment.lastName) },
+    { name: 'WEBTRAC_BILL_PHONE', ok: Boolean(config.payment.phone) },
+    { name: 'WEBTRAC_BILL_EMAIL', ok: Boolean(config.payment.email) },
+    { name: 'WEBTRAC_CARD_NAME', ok: Boolean(config.payment.cardName) },
+    { name: 'WEBTRAC_BILL_ADDRESS1', ok: Boolean(config.payment.address1) },
+    { name: 'WEBTRAC_BILL_POSTAL_CODE', ok: Boolean(config.payment.postalCode) },
+    { name: 'WEBTRAC_CARD_NUMBER', ok: Boolean(config.payment.cardNumber) },
+    { name: 'WEBTRAC_CARD_EXP', ok: Boolean(config.payment.cardExp) },
+    { name: 'WEBTRAC_CARD_CVC', ok: Boolean(config.payment.cardCvc) },
+  ];
+}
+
+export function assertPaymentConfig() {
+  const missing = paymentEnvStatus().filter((item) => !item.ok).map((item) => item.name);
+  if (missing.length) {
+    const err = new Error(`Missing WebTrac payment env vars: ${missing.join(', ')}`);
+    err.code = 'MISSING_PAYMENT_ENV';
+    err.missing = missing;
+    throw err;
+  }
 }

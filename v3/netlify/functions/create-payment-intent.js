@@ -30,7 +30,7 @@ exports.handler = async (event) => {
 
   const booking = body.booking && typeof body.booking === 'object' ? body.booking : {};
   const purpose = body.purpose === 'support' ? 'support' : 'court_booking';
-  const captureMethod = body.captureMethod === 'automatic' ? 'automatic' : 'manual';
+  const captureMethod = purpose === 'support' && body.captureMethod === 'automatic' ? 'automatic' : 'manual';
   const params = new URLSearchParams();
   params.set('amount', String(amount));
   params.set('currency', 'usd');

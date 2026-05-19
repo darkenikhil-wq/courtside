@@ -9,7 +9,8 @@
     "clean": "node src/clean.js",
     "doctor": "node src/doctor.js",
     "smoke": "node src/smoke.js",
-    "inspect:checkout": "node src/inspect-checkout.js"
+    "inspect:checkout": "node src/inspect-checkout.js",
+    "finalize:checkout": "node src/finalize-checkout.js"
   },
   "dependencies": {
     "dotenv": "^16.4.7",

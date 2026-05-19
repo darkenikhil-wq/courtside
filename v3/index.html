@@ -1877,6 +1877,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             amountCents,
+            captureMethod: 'manual',
             booking: {
               courtName: bookingPayload.courtName,
               courtCode: bookingPayload.courtCode,
@@ -1899,13 +1900,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           layout: { type: 'accordion', defaultCollapsed: false },
         });
         paymentElement.mount(elementEl);
-        activeStripePayment = { stripe, elements, amountCents };
+        activeStripePayment = { stripe, elements, amountCents, bookingPayload };
 
         if (payBtn) {
           payBtn.disabled = false;
           payBtn.onclick = () => confirmStripePayment(payBtn, paymentStatusEl);
         }
-        setPaymentStatus(paymentStatusEl, 'Secure payment is ready. Final Arlington/WebTrac checkout is still paused for inspection.', '');
+        setPaymentStatus(paymentStatusEl, 'Secure payment is ready. Your card is authorized first, then captured only after Arlington/WebTrac confirms.', '');
       } catch (e) {
         setPaymentStatus(paymentStatusEl, e.message || 'Could not prepare payment.', 'warn');
       }
@@ -1917,7 +1918,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       payBtn.textContent = 'Confirming...';
       setPaymentStatus(paymentStatusEl, 'Opening secure payment...', '');
 
-      const { stripe, elements, amountCents } = activeStripePayment;
+      const { stripe, elements, amountCents, bookingPayload } = activeStripePayment;
       const { error, paymentIntent } = await stripe.confirmPayment({
         elements,
         confirmParams: { return_url: location.href },
@@ -1931,12 +1932,154 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         return;
       }
 
-      payBtn.textContent = 'Payment authorized';
-      setPaymentStatus(
-        paymentStatusEl,
-        `Payment ${paymentIntent?.status || 'authorized'} for ${formatUsd(amountCents)}. Final Arlington/WebTrac checkout remains paused for inspection.`,
-        'ok'
-      );
+      if (!paymentIntent?.id || paymentIntent.status !== 'requires_capture') {
+        payBtn.disabled = false;
+        payBtn.textContent = 'Confirm booking / pay';
+        setPaymentStatus(paymentStatusEl, `Stripe returned ${paymentIntent?.status || 'an unknown status'} instead of an authorization. No WebTrac checkout was attempted.`, 'warn');
+        return;
+      }
+
+      payBtn.textContent = 'Finishing...';
+      setPaymentStatus(paymentStatusEl, `Payment authorized for ${formatUsd(amountCents)}. Completing Arlington/WebTrac checkout...`, '');
+
+      const result = await finalizeAuthorizedBooking(paymentIntent.id, bookingPayload);
+      if (result.ok) {
+        activeStripePayment = null;
+        payBtn.disabled = true;
+        payBtn.textContent = 'Booked';
+        setPaymentStatus(paymentStatusEl, result.message || 'Court booked through Arlington/WebTrac. Payment captured.', 'ok');
+        track('booking_payment_captured', { amountCents });
+        return;
+      }
+
+      payBtn.disabled = result.retryable === false;
+      payBtn.textContent = result.retryable === false ? 'Review manually' : 'Try again';
+      setPaymentStatus(paymentStatusEl, result.message || 'WebTrac did not confirm the booking. Stripe authorization was released.', 'warn');
+      track('booking_payment_released', { amountCents, code: result.code || null });
+    }
+
+    async function finalizeAuthorizedBooking(paymentIntentId, bookingPayload) {
+      const localWorker = localBookingWorkerConfig();
+      if (localWorker?.url) {
+        return finalizeWithLocalWorker(paymentIntentId, bookingPayload, localWorker);
+      }
+
+      try {
+        const res = await fetch('/.netlify/functions/finalize-booking', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ paymentIntentId, booking: bookingPayload }),
+        });
+        const data = await res.json().catch(() => ({}));
+        return {
+          ok: res.ok && data.status === 'confirmed',
+          retryable: data.status !== 'payment_capture_failed',
+          code: data.code,
+          message: data.message || (res.ok ? 'Court booked through Arlington/WebTrac. Payment captured.' : 'WebTrac did not confirm the booking. Stripe authorization was released.'),
+          webtrac: data.webtrac,
+          payment: data.payment,
+        };
+      } catch (e) {
+        const release = await settleStripePayment('cancel', paymentIntentId, 'finalize_unreachable');
+        return {
+          ok: false,
+          retryable: true,
+          code: 'FINALIZE_SERVICE_UNREACHABLE',
+          message: release.ok
+            ? 'Final booking service is not reachable. Stripe authorization was released.'
+            : 'Final booking service is not reachable, and Stripe authorization could not be released automatically. Review this payment in Stripe.',
+          payment: release.data,
+        };
+      }
+    }
+
+    async function finalizeWithLocalWorker(paymentIntentId, bookingPayload, localWorker) {
+      const finalizeUrl = localWorkerFinalizeUrl(localWorker.url);
+      const headers = { 'Content-Type': 'application/json' };
+      if (localWorker.token) headers.Authorization = `Bearer ${localWorker.token}`;
+
+      let webtrac;
+      try {
+        const res = await fetch(finalizeUrl, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ booking: bookingPayload }),
+        });
+        webtrac = await res.json().catch(() => ({}));
+        webtrac.httpStatus = res.status;
+      } catch (e) {
+        webtrac = {
+          status: 'adapter_unreachable',
+          code: 'WEBTRAC_FINALIZE_ADAPTER_UNREACHABLE',
+          message: e.message || 'Local WebTrac worker is not reachable.',
+        };
+      }
+
+      if (webtrac.status === 'webtrac_confirmed') {
+        const capture = await settleStripePayment('capture', paymentIntentId);
+        if (capture.ok) {
+          return {
+            ok: true,
+            message: 'Court booked through Arlington/WebTrac. Payment captured.',
+            webtrac,
+            payment: capture.data,
+          };
+        }
+        return {
+          ok: false,
+          retryable: false,
+          code: capture.data?.code || 'STRIPE_CAPTURE_ERROR',
+          message: 'WebTrac appears confirmed, but Stripe capture failed. Review this booking manually.',
+          webtrac,
+          payment: capture.data,
+        };
+      }
+
+      const release = await settleStripePayment('cancel', paymentIntentId, webtrac.code || 'webtrac_not_confirmed');
+      return {
+        ok: false,
+        retryable: release.ok,
+        code: webtrac.code || 'WEBTRAC_NOT_CONFIRMED',
+        message: release.ok
+          ? `${webtrac.message || 'WebTrac did not confirm the booking.'} Stripe authorization was released.`
+          : `${webtrac.message || 'WebTrac did not confirm the booking.'} Stripe authorization could not be released automatically. Review this payment in Stripe.`,
+        webtrac,
+        payment: release.data,
+      };
+    }
+
+    function localWorkerFinalizeUrl(reserveUrl) {
+      const url = new URL(reserveUrl);
+      url.pathname = url.pathname.replace(/\/reserve\/?$/, '/checkout/finalize');
+      if (!/\/checkout\/finalize\/?$/.test(url.pathname)) {
+        url.pathname = `${url.pathname.replace(/\/$/, '')}/checkout/finalize`;
+      }
+      return url.toString();
+    }
+
+    async function settleStripePayment(action, paymentIntentId, reason) {
+      const endpoint = action === 'capture'
+        ? '/.netlify/functions/capture-payment-intent'
+        : '/.netlify/functions/cancel-payment-intent';
+      try {
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ paymentIntentId, reason }),
+        });
+        const data = await res.json().catch(() => ({}));
+        return { ok: res.ok, status: res.status, data };
+      } catch (e) {
+        return {
+          ok: false,
+          status: 0,
+          data: {
+            status: 'network_error',
+            code: action === 'capture' ? 'CAPTURE_SERVICE_UNREACHABLE' : 'CANCEL_SERVICE_UNREACHABLE',
+            message: e.message || 'Stripe settlement service is not reachable.',
+          },
+        };
+      }
     }
 
     function supportAmountCents() {
