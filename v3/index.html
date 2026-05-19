@@ -934,6 +934,95 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       padding: 3px 8px;
       border-radius: 999px;
     }
+    .time-search-actions {
+      display: grid;
+      gap: 10px;
+      margin-top: 14px;
+    }
+    .search-summary {
+      margin: 0 0 14px;
+      padding: 11px 12px;
+      border-radius: 10px;
+      background: rgba(var(--accent-rgb), 0.07);
+      border: 1px solid rgba(var(--accent-rgb), 0.24);
+      color: var(--ink);
+      font-size: 13px;
+      line-height: 1.45;
+      text-align: left;
+    }
+    .result-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .result-card {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+      padding: 14px 16px;
+      background: var(--card-elev);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      color: var(--ink);
+      text-decoration: none;
+      transition: border-color 0.15s, transform 0.05s;
+    }
+    .result-card:hover { border-color: rgba(var(--accent-rgb), 0.45); }
+    .result-card:active { transform: scale(0.99); }
+    .result-card.disabled {
+      opacity: 0.58;
+      pointer-events: none;
+    }
+    .result-main {
+      display: grid;
+      gap: 4px;
+      text-align: left;
+    }
+    .result-name {
+      font-size: 15px;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+    .result-meta {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.3;
+    }
+    .result-status {
+      min-width: 86px;
+      padding: 7px 9px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      text-align: center;
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+    }
+    .result-status.open {
+      border-color: rgba(var(--accent-rgb), 0.45);
+      background: rgba(var(--accent-rgb), 0.10);
+      color: var(--accent);
+    }
+    .result-status.full {
+      border-color: rgba(248, 113, 113, 0.32);
+      background: rgba(248, 113, 113, 0.08);
+      color: #fecaca;
+    }
+    .result-status.warn {
+      border-color: rgba(251, 191, 36, 0.32);
+      background: rgba(251, 191, 36, 0.08);
+      color: #fde68a;
+    }
+    .results-toolbar {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 14px;
+    }
+    .results-toolbar .btn { margin-bottom: 0; }
     .error {
       color: var(--error);
       background: rgba(220, 38, 38, 0.08);
@@ -1058,6 +1147,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     @media (max-width: 480px) {
       .card { padding: 36px 24px 28px; border-radius: 24px; }
       h1 { font-size: 32px; }
+      .result-card { grid-template-columns: 1fr; align-items: stretch; }
+      .result-status { width: max-content; min-width: 0; }
+      .results-toolbar { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -1101,10 +1193,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
   <script>
     // -------------------- Court data --------------------
-    // To add a court: drop in name, lat/lng (Google Maps right-click → copy coords),
-    // and WebTrac location code (from the Location dropdown's resulting URL).
-    // VERIFY: every `code` and lat/lng below was entered by hand and must be
-    // confirmed against the live WebTrac Location dropdown + a real map check.
+    // To add a court: drop in name, lat/lng from the official Arlington facility
+    // page (or APS page for school courts), and WebTrac location code from the
+    // Location dropdown's resulting URL.
     //
     //   How to verify a `code`:
     //     1. Open https://vaarlingtonweb.myvscloud.com/webtrac/web/search.html?type=TENNIS&module=FR
@@ -1112,8 +1203,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     //     3. The resulting URL contains `location=XXXX` — that's the code
     //
     //   How to verify lat/lng:
-    //     Google Maps → find the actual tennis/pickle/volleyball court (not the
-    //     park entrance) → right-click on the court → copy coordinates.
+    //     Use the official Arlington facility page's embedded map coordinate
+    //     first; for school courts, use the APS/school listing and a map check.
     //
     //   Known-to-be-guesses that should be double-checked first:
     //     - virginia-highlands  code: 'VA-H'    (possible: 'VA-H', 'VAH', 'VAHGH')
@@ -1131,32 +1222,32 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     //     notes     (string)  — short one-liner (e.g. "Walk-up only on weekends")
     //   These are NOT filled in yet — fill in as you confirm each.
     const COURTS = [
-      { id: 'barcroft',           name: 'Barcroft Park',           lat: 38.8440, lng: -77.1060, code: 'BARCR', sports: ['tennis', 'volleyball'] },
-      { id: 'bluemont',           name: 'Bluemont Park',           lat: 38.8720, lng: -77.1300, code: 'BLUE',  sports: ['tennis'] },
-      { id: 'bon-air',            name: 'Bon Air Park',            lat: 38.8800, lng: -77.1330, code: 'BONA',  sports: ['tennis'] },
-      { id: 'carver',             name: 'Carver Center',           lat: 38.8640, lng: -77.0630, code: 'CARV',  sports: ['tennis'] },
-      { id: 'fairlington',        name: 'Fairlington Center',      lat: 38.8320, lng: -77.0920, code: 'FAIR',  sports: ['tennis'] },
-      { id: 'fort-scott',         name: 'Fort Scott Park',         lat: 38.8530, lng: -77.0570, code: 'FSCOT', sports: ['tennis', 'pickleball'] },
-      { id: 'glebe',              name: 'Glebe Park',              lat: 38.8860, lng: -77.1180, code: 'GLEBP', sports: ['tennis', 'pickleball'] },
-      { id: 'greenbrier',         name: 'Greenbrier Park',         lat: 38.8970, lng: -77.1370, code: 'GREEN', sports: ['tennis'] },
-      { id: 'gunston',            name: 'Gunston Park',            lat: 38.8520, lng: -77.0800, code: 'GUNP',  sports: ['tennis'] },
-      { id: 'hayes',              name: 'Hayes Park',              lat: 38.8800, lng: -77.0990, code: 'HAYES', sports: ['tennis', 'pickleball'] },
-      { id: 'jamestown',          name: 'Jamestown Park',          lat: 38.9180, lng: -77.1550, code: 'JAMEP', sports: ['tennis'] },
-      { id: 'jennie-dean',        name: 'Jennie Dean Park',        lat: 38.8720, lng: -77.0850, code: 'JDEAN', sports: ['tennis'] },
-      { id: 'kenmore',            name: 'Kenmore MS',              lat: 38.8750, lng: -77.1240, code: 'KEN',   sports: ['tennis'] },
-      { id: 'langston-brown',     name: 'Langston-Brown',          lat: 38.8920, lng: -77.1310, code: 'LANGS', sports: ['tennis'] },
-      { id: 'lyon-village',       name: 'Lyon Village Park',       lat: 38.8945, lng: -77.0926, code: 'LYON',  sports: ['tennis'] },
-      { id: 'madison-manor',      name: 'Madison Manor Park',      lat: 38.8920, lng: -77.1500, code: 'MADM',  sports: ['tennis'] },
-      { id: 'marcey-road',        name: 'Marcey Road Park',        lat: 38.9130, lng: -77.1100, code: 'MARCY', sports: ['tennis', 'pickleball'] },
-      { id: 'maury',              name: 'Maury Park',              lat: 38.8860, lng: -77.1050, code: 'MAURY', sports: ['tennis'] },
-      { id: 'quincy',             name: 'Quincy Park',             lat: 38.8843, lng: -77.1064, code: 'QUINC', sports: ['tennis', 'volleyball'] },
-      { id: 'stratford',          name: 'Stratford Park',          lat: 38.9010, lng: -77.1400, code: 'STRAT', sports: ['tennis'] },
-      { id: 'thomas-jefferson',   name: 'Thomas Jefferson Center', lat: 38.8600, lng: -77.0920, code: 'TJ',    sports: ['tennis'] },
-      { id: 'towers',             name: 'Towers Park',             lat: 38.8900, lng: -77.0870, code: 'TOWER', sports: ['tennis', 'volleyball'] },
-      { id: 'tuckahoe',           name: 'Tuckahoe Park',           lat: 38.8950, lng: -77.1430, code: 'TUCKP', sports: ['tennis'] },
-      { id: 'utah',               name: 'Utah Park',               lat: 38.8820, lng: -77.1580, code: 'UTAH',  sports: ['volleyball'] },
-      { id: 'virginia-highlands', name: 'Virginia Highlands Park', lat: 38.8600, lng: -77.0617, code: 'VA-H',  sports: ['tennis', 'volleyball', 'pickleball'] },
-      { id: 'westover',           name: 'Westover Park',           lat: 38.8800, lng: -77.1460, code: 'WESTO', sports: ['volleyball'] },
+      { id: 'barcroft',           name: 'Barcroft Park',                         lat: 38.8505704, lng: -77.1020494, code: 'BARCR', sports: ['tennis', 'volleyball'] },
+      { id: 'bluemont',           name: 'Bluemont Park',                         lat: 38.8695020, lng: -77.1323060, code: 'BLUE',  sports: ['tennis'] },
+      { id: 'bon-air',            name: 'Bon Air Park',                          lat: 38.8755314, lng: -77.1325117, code: 'BONA',  sports: ['tennis'] },
+      { id: 'carver',             name: 'Carver Community Center',               lat: 38.8617358, lng: -77.0711967, code: 'CARV',  sports: ['tennis'] },
+      { id: 'fairlington',        name: 'Fairlington Community Center & Park',   lat: 38.8344329, lng: -77.0874290, code: 'FAIR',  sports: ['tennis'] },
+      { id: 'fort-scott',         name: 'Fort Scott Park',                       lat: 38.8465466, lng: -77.0589256, code: 'FSCOT', sports: ['tennis', 'pickleball'] },
+      { id: 'glebe',              name: 'Glebe Road Park',                       lat: 38.9217827, lng: -77.1263818, code: 'GLEBP', sports: ['tennis', 'pickleball'] },
+      { id: 'greenbrier',         name: 'Greenbrier Park',                       lat: 38.9007084, lng: -77.1398990, code: 'GREEN', sports: ['tennis'] },
+      { id: 'gunston',            name: 'Gunston Park',                          lat: 38.8470600, lng: -77.0700720, code: 'GUNP',  sports: ['tennis'] },
+      { id: 'hayes',              name: 'Hayes Park',                            lat: 38.8897071, lng: -77.1042210, code: 'HAYES', sports: ['tennis', 'pickleball'] },
+      { id: 'jamestown',          name: 'Jamestown Park',                        lat: 38.9168510, lng: -77.1414140, code: 'JAMEP', sports: ['tennis'] },
+      { id: 'jennie-dean',        name: 'Jennie Dean Park',                      lat: 38.8439331, lng: -77.0873448, code: 'JDEAN', sports: ['tennis'] },
+      { id: 'kenmore',            name: 'Kenmore Middle School',                 lat: 38.8655169, lng: -77.1297975, code: 'KEN',   sports: ['tennis'] },
+      { id: 'langston-brown',     name: 'Langston-Brown Community Center',       lat: 38.8959705, lng: -77.1266741, code: 'LANGS', sports: ['tennis'] },
+      { id: 'lyon-village',       name: 'Lyon Village Park',                     lat: 38.8937180, lng: -77.0947330, code: 'LYON',  sports: ['tennis'] },
+      { id: 'madison-manor',      name: 'Madison Manor Park',                    lat: 38.8825550, lng: -77.1498390, code: 'MADM',  sports: ['tennis'] },
+      { id: 'marcey-road',        name: 'Marcey Road Park',                      lat: 38.9107050, lng: -77.1096010, code: 'MARCY', sports: ['tennis', 'pickleball'] },
+      { id: 'maury',              name: 'Maury Park',                            lat: 38.8819386, lng: -77.1024012, code: 'MAURY', sports: ['tennis'] },
+      { id: 'quincy',             name: 'Quincy Park',                           lat: 38.8856109, lng: -77.1079805, code: 'QUINC', sports: ['tennis', 'volleyball'] },
+      { id: 'stratford',          name: 'Stratford Park',                        lat: 38.8997830, lng: -77.1136080, code: 'STRAT', sports: ['tennis'] },
+      { id: 'thomas-jefferson',   name: 'Thomas Jefferson Community Center',     lat: 38.8705019, lng: -77.0958233, code: 'TJ',    sports: ['tennis'] },
+      { id: 'towers',             name: 'Towers Park',                           lat: 38.8671088, lng: -77.0776606, code: 'TOWER', sports: ['tennis', 'volleyball'] },
+      { id: 'tuckahoe',           name: 'Tuckahoe Park',                         lat: 38.8922180, lng: -77.1578750, code: 'TUCKP', sports: ['tennis'] },
+      { id: 'utah',               name: 'Utah Park',                             lat: 38.8379943, lng: -77.0859565, code: 'UTAH',  sports: ['volleyball'] },
+      { id: 'virginia-highlands', name: 'Virginia Highlands Park',               lat: 38.8587766, lng: -77.0599123, code: 'VA-H',  sports: ['tennis', 'volleyball', 'pickleball'] },
+      { id: 'westover',           name: 'Westover Park',                         lat: 38.8801792, lng: -77.1357306, code: 'WESTO', sports: ['volleyball'] },
     ];
 
     const SPORTS = {
@@ -1310,7 +1401,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     function courtsForSelectedSport() {
-      return COURTS.filter(c => c.sports.includes(selectedSport));
+      return COURTS
+        .filter(c => c.sports.includes(selectedSport))
+        .slice()
+        .sort((a, b) => a.name.localeCompare(b.name));
     }
 
     function formatDist(d) {
@@ -1489,24 +1583,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       toastTimer = setTimeout(() => el.classList.remove('show'), 1800);
     }
 
-    // Auto-route ("user is at the court") thresholds.
-    // Phone GPS error is routinely 20–50m (and worse under tree cover / urban),
-    // so a strict 0.1mi cutoff was too tight — a user literally on a court can
-    // read >0.1mi away. We auto-route if EITHER:
-    //   - nearest court is within AT_COURT_THRESHOLD_MI (absolute distance), OR
-    //   - "dominantly nearest" AND still reasonably close:
-    //       nearest.dist <= DOMINANT_NEAREST_MAX_MI
-    //       AND nearest.dist < second.dist * DOMINANT_NEAREST_RATIO
-    //
-    // The MAX_MI cap is critical: without it, a user 5mi from any court would
-    // get auto-routed to whichever single court is 5x closer than the next one.
-    // Far-away users must always land on the court-list fallback.
-    //
-    // Single-court case (some sports have only a few): use withinAbsolute only.
-    // Do NOT auto-route to a single court that's far away.
-    const AT_COURT_THRESHOLD_MI   = 0.25;
-    const DOMINANT_NEAREST_MAX_MI = 0.5;
-    const DOMINANT_NEAREST_RATIO  = 0.6;
+    // Auto-route only in the explicit "I'm at the court" flow. The normal
+    // booking journey is time-first and always shows options instead of jumping
+    // to whichever court is geographically nearest.
+    const AT_COURT_THRESHOLD_MI   = 0.12;
 
     // ==================== v3: Booking preferences + Arlington rules ====================
     // User-selected date / time / duration drive Courtside's in-app booking intent.
@@ -1747,6 +1827,65 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         out.push(`${String(hr).padStart(2, '0')}:${String(mn).padStart(2, '0')}`);
       }
       return out;
+    }
+
+    function slotRangeAvailable(slots, requireKnownSlots = true) {
+      if (!bookingPrefs.time) return false;
+      const lookup = new Map((slots || []).map(s => [s.start, s]));
+      return bookingSlotKeys(bookingPrefs.time, bookingPrefs.duration).every(key => {
+        const info = lookup.get(key);
+        if (!info) return !requireKnownSlots;
+        return info.available !== false;
+      });
+    }
+
+    function availabilitySummaryForSelectedRange(availability, court) {
+      if (availability && availability.__error) {
+        return {
+          tone: 'warn',
+          label: 'Check manually',
+          detail: `Live availability did not load for ${formatBookingRange()}.`,
+        };
+      }
+
+      const normalized = normalizeAvailabilityPayload(availability || {});
+      if (normalized.courts.length) {
+        const openUnits = normalized.courts.filter(unit => slotRangeAvailable(unit.slots, true));
+        if (openUnits.length) {
+          const unitNames = openUnits
+            .slice(0, 2)
+            .map(unit => friendlyCourtUnitLabel(unit.label, court && court.name))
+            .join(', ');
+          const more = openUnits.length > 2 ? ` +${openUnits.length - 2} more` : '';
+          return {
+            tone: 'open',
+            label: `${openUnits.length}/${normalized.courts.length} open`,
+            detail: `${unitNames}${more} at ${formatBookingRange()}`,
+          };
+        }
+        return {
+          tone: 'full',
+          label: 'Full',
+          detail: `No courts open at ${formatBookingRange()}`,
+        };
+      }
+
+      if (normalized.slots.length) {
+        const open = slotRangeAvailable(normalized.slots, true);
+        return {
+          tone: open ? 'open' : 'full',
+          label: open ? 'Open' : 'Full',
+          detail: open
+            ? `Available at ${formatBookingRange()}`
+            : `Unavailable at ${formatBookingRange()}`,
+        };
+      }
+
+      return {
+        tone: 'warn',
+        label: 'Manual check',
+        detail: `No detailed availability came back for ${formatBookingRange()}.`,
+      };
     }
 
     // Apply availability data to the live #prefTime <select>. Disabled options
@@ -3017,7 +3156,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
       card.innerHTML = `
         <h1>What are you<br><em>playing?</em></h1>
-        <p class="perm-body">Pick a sport — we'll find the closest court.</p>
+        <p class="perm-body">Pick a sport, then choose when you want to play. We'll show courts with availability.</p>
         ${recentHtml}
         ${buttons}
         <a href="#" class="inline-link" data-action="share" data-cta-id="home-share"
@@ -3029,7 +3168,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           selectedSport = btn.dataset.sport;
           rememberSport(selectedSport);
           track('sport_selected', { sport: selectedSport });
-          continueToLocation();
+          renderTimeFirstSearch();
         });
       });
 
@@ -3060,6 +3199,141 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (el) el.addEventListener('click', () => renderSportPicker());
     }
 
+    function timePickerHtml() {
+      initBookingPrefsIfNeeded();
+      const minDateAttr = defaultBookingDateISO();
+      const maxDateAttr = maxBookingDateISO();
+      return `
+        <div class="when-picker">
+          <p class="when-label">When?</p>
+          <div class="when-row">
+            <input class="when-input" type="date"
+                   id="prefDate" min="${minDateAttr}" max="${maxDateAttr}"
+                   value="${bookingPrefs.date}" required>
+            <select class="when-input" id="prefTime" required>
+              ${listBookingTimes(bookingPrefs.duration).map(t => `
+                <option value="${t.value}"${t.value === bookingPrefs.time ? ' selected' : ''}>${t.label}</option>
+              `).join('')}
+            </select>
+          </div>
+          <div class="duration-toggle" role="radiogroup" aria-label="Duration">
+            <button type="button" class="seg${bookingPrefs.duration === 60 ? ' active' : ''}" data-duration="60" role="radio" aria-checked="${bookingPrefs.duration === 60}">60 min</button>
+            <button type="button" class="seg${bookingPrefs.duration === 90 ? ' active' : ''}" data-duration="90" role="radio" aria-checked="${bookingPrefs.duration === 90}">90 min</button>
+          </div>
+          <div class="booking-range" id="bookingRange">${formatBookingRange()}</div>
+        </div>`;
+    }
+
+    function wireStandaloneTimePicker(onChange) {
+      const dateEl = document.getElementById('prefDate');
+      const timeEl = document.getElementById('prefTime');
+      const rangeEl = document.getElementById('bookingRange');
+      const updateRange = () => {
+        if (rangeEl) rangeEl.textContent = formatBookingRange();
+        if (onChange) onChange();
+      };
+      const rebuildTimeDropdown = () => {
+        if (!timeEl) return;
+        const current = bookingPrefs.time;
+        const times = listBookingTimes(bookingPrefs.duration);
+        if (!times.length) {
+          timeEl.innerHTML = '<option value="">No valid times</option>';
+          timeEl.disabled = true;
+          bookingPrefs.time = '';
+          updateRange();
+          return;
+        }
+        timeEl.disabled = false;
+        timeEl.innerHTML = times.map(t =>
+          `<option value="${t.value}">${t.label}</option>`
+        ).join('');
+        const stillValid = times.find(t => t.value === current);
+        const next = stillValid || times[0];
+        timeEl.value = next.value;
+        bookingPrefs.time = next.value;
+        updateRange();
+      };
+
+      if (dateEl) dateEl.addEventListener('change', () => {
+        if (!dateEl.value) return;
+        bookingPrefs.date = dateEl.value;
+        rebuildTimeDropdown();
+      });
+      if (timeEl) timeEl.addEventListener('change', () => {
+        if (!timeEl.value) return;
+        bookingPrefs.time = timeEl.value;
+        updateRange();
+      });
+      card.querySelectorAll('.duration-toggle .seg').forEach(seg => {
+        seg.addEventListener('click', () => {
+          bookingPrefs.duration = parseInt(seg.dataset.duration, 10);
+          card.querySelectorAll('.duration-toggle .seg').forEach(s => {
+            const active = s === seg;
+            s.classList.toggle('active', active);
+            s.setAttribute('aria-checked', String(active));
+          });
+          rebuildTimeDropdown();
+        });
+      });
+    }
+
+    function renderTimeFirstSearch(errMsg) {
+      card.innerHTML = `
+        ${backLinkHtml}
+        ${sportIconSvg(selectedSport, false)}
+        <h1>When do you<br><em>want to play?</em></h1>
+        <p class="perm-body">
+          Choose a time first. Then Courtside will show nearby courts and how much availability each one has.
+        </p>
+        ${errMsg ? `<div class="error">${errMsg}</div>` : ''}
+        ${timePickerHtml()}
+        <div class="time-search-actions">
+          <button class="btn btn-primary" id="nearbySearchBtn" type="button">Find courts near me</button>
+          <button class="btn btn-secondary" id="browseCourtsBtn" type="button">Browse all courts</button>
+          <button class="btn btn-ghost" id="atCourtBtn" type="button">I'm at a court</button>
+        </div>
+        <p class="rules-hint">Arlington rules: 1-14 days ahead · 60 or 90 min · closes 9pm</p>
+      `;
+      wireStandaloneTimePicker();
+      document.getElementById('nearbySearchBtn').addEventListener('click', requestCourtSearchLocation);
+      document.getElementById('browseCourtsBtn').addEventListener('click', () => {
+        track('court_search_browse_all', { sport: selectedSport });
+        renderCourtSearchResults(null);
+      });
+      document.getElementById('atCourtBtn').addEventListener('click', () => {
+        track('at_court_flow_started', { sport: selectedSport });
+        continueToLocation();
+      });
+      wireBackLink();
+    }
+
+    function requestCourtSearchLocation() {
+      renderSearchLocating();
+      if (!('geolocation' in navigator)) {
+        renderCourtSearchResults(null, 'Your browser does not support geolocation, so here are all courts for this sport.');
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        pos => {
+          track('court_search_location_granted', { sport: selectedSport });
+          const userLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+          renderCourtSearchResults(userLoc);
+        },
+        err => {
+          track('court_search_location_failed', { code: err.code, sport: selectedSport });
+          const msg = err.code === 1
+            ? 'Location is blocked. You can still browse all courts for this time.'
+            : err.code === 2
+              ? "Couldn't determine your location. Showing all courts instead."
+              : err.code === 3
+                ? 'Location request timed out. Showing all courts instead.'
+                : 'Could not get your location. Showing all courts instead.';
+          renderCourtSearchResults(null, msg);
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+      );
+    }
+
     function renderPermissionPrompt() {
       card.innerHTML = `
         ${backLinkHtml}
@@ -3070,24 +3344,31 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             <circle cx="12" cy="10" r="3"/>
           </svg>
         </div>
-        <h1>Find<br><em>your court</em></h1>
+        <h1>Are you<br><em>at a court?</em></h1>
         <p class="perm-body">
-          We'll use your location to pick the right court and open the court's
-          availability on WebTrac.
+          This shortcut is only for players standing at or beside a court. Otherwise, use the time-first search.
         </p>
-        <button class="btn btn-primary" id="allowBtn">Use my location</button>
-        <button class="btn btn-secondary" id="pickBtn">Pick manually</button>
+        <button class="btn btn-primary" id="allowBtn">Use my court location</button>
+        <button class="btn btn-secondary" id="pickBtn">Search by time instead</button>
       `;
       document.getElementById('allowBtn').addEventListener('click', requestLocation);
-      document.getElementById('pickBtn').addEventListener('click', () => renderFallback());
+      document.getElementById('pickBtn').addEventListener('click', () => renderTimeFirstSearch());
       wireBackLink();
     }
 
     function renderLocating() {
       card.innerHTML = `
         ${sportIconSvg(selectedSport, true)}
-        <h1>Finding the<br><em>closest court</em></h1>
+        <h1>Checking your<br><em>court location</em></h1>
         <p class="status" id="status">Getting your location…</p>
+      `;
+    }
+
+    function renderSearchLocating() {
+      card.innerHTML = `
+        ${sportIconSvg(selectedSport, true)}
+        <h1>Checking<br><em>availability</em></h1>
+        <p class="status" id="status">Finding courts near you for ${formatBookingRange()}…</p>
       `;
     }
 
@@ -3115,14 +3396,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           </p>
         </div>
         <button class="btn btn-primary" id="retryBtn">Try again</button>
-        <button class="btn btn-outline" id="pickBtn">Pick a court manually</button>
+        <button class="btn btn-outline" id="pickBtn">Search by time instead</button>
         <button class="btn btn-secondary" id="skipBtn">Just open the booking site</button>
       `;
       document.getElementById('retryBtn').addEventListener('click', () => location.reload());
       document.getElementById('skipBtn').addEventListener('click', () => {
         location.href = webtracAllCourtsUrl();
       });
-      document.getElementById('pickBtn').addEventListener('click', () => renderFallback());
+      document.getElementById('pickBtn').addEventListener('click', () => renderTimeFirstSearch());
       wireBackLink();
     }
 
@@ -3138,30 +3419,24 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           const userLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
           const sorted = courtsWithDistances(userLoc.lat, userLoc.lng);
           const court = sorted[0];
-          const second = sorted[1];
           if (!court || !court.code || court.code === 'TBD') {
-            renderFallback(
+            renderCourtSearchResults(
+              userLoc,
               court
                 ? `The closest court (${court.name}) isn't configured yet — ` +
                   `its WebTrac location code needs to be filled in.`
-                : `No courts configured for this sport yet.`,
-              userLoc
+                : `No courts configured for this sport yet.`
             );
             return;
           }
-          // Auto-route if user is clearly AT a court. Two-pronged check
-          // because GPS error alone can push them past a strict absolute distance.
-          // The dominant-nearest branch is distance-capped so a user miles away
-          // never gets auto-routed just because one court is closer than the rest.
-          const withinAbsolute = court.dist <= AT_COURT_THRESHOLD_MI;
-          const dominantNearest = second
-            ? (court.dist <= DOMINANT_NEAREST_MAX_MI &&
-               court.dist < second.dist * DOMINANT_NEAREST_RATIO)
-            : false; // single-court case: rely on withinAbsolute only
-          if (withinAbsolute || dominantNearest) {
+          if (court.dist <= AT_COURT_THRESHOLD_MI) {
             renderPostBooking(court, userLoc);
           } else {
-            renderFallback(null, userLoc);
+            const dist = formatDist(court.dist);
+            renderCourtSearchResults(
+              userLoc,
+              `You do not appear to be right at a court. The nearest match is ${court.name} (${dist}), so here are available options for ${formatBookingRange()}.`
+            );
           }
         },
         err => {
@@ -3173,7 +3448,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
               err.code === 2 ? "Couldn't determine your location." :
               err.code === 3 ? 'Location request timed out.' :
               'Could not get your location.';
-            renderFallback(msg);
+            renderTimeFirstSearch(msg);
           }
         },
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
@@ -3821,107 +4096,107 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }).join('');
     }
 
-    const NEARBY_INITIAL_COUNT = 3;
+    let courtSearchRunId = 0;
 
-    // Renders the court list. Two modes:
-    //   - With userLoc (sorted by distance, distances shown)   → "Closest X courts"
-    //                                                            shows top 3 + Show more + CTAs
-    //   - Without userLoc (alphabetical, no distances)         → "Pick an X court"
-    //                                                            full list, no CTAs
-    function renderFallback(errMsg, userLoc) {
+    function resultCardHtml(court, nearby) {
+      const disabled = !court.code || court.code === 'TBD';
+      const distance = nearby && typeof court.dist === 'number' ? `${formatDist(court.dist)} away` : '';
+      const meta = [
+        distance,
+        court.numCourts ? `${court.numCourts} courts` : '',
+        disabled ? 'WebTrac setup needed' : `Checking ${formatBookingRange()}`,
+      ].filter(Boolean).join(' · ');
+      return `
+        <a class="result-card${disabled ? ' disabled' : ''}" href="#" data-result-court-id="${court.id}">
+          <span class="result-main">
+            <span class="result-name">${escapeHtml(court.name)}</span>
+            <span class="result-meta" data-result-meta="${court.id}">${escapeHtml(meta)}</span>
+          </span>
+          <span class="result-status${disabled ? ' warn' : ''}" data-result-status="${court.id}">
+            ${disabled ? 'Setup' : 'Checking'}
+          </span>
+        </a>`;
+    }
+
+    function updateResultCard(court, summary, nearby) {
+      const statusEl = card.querySelector(`[data-result-status="${court.id}"]`);
+      const metaEl = card.querySelector(`[data-result-meta="${court.id}"]`);
+      if (!statusEl || !metaEl) return;
+      statusEl.className = `result-status ${summary.tone || ''}`.trim();
+      statusEl.textContent = summary.label;
+      const distance = nearby && typeof court.dist === 'number' ? `${formatDist(court.dist)} away` : '';
+      metaEl.textContent = [distance, summary.detail].filter(Boolean).join(' · ');
+    }
+
+    async function loadCourtSearchAvailability(courts, nearby, runId) {
+      const queue = courts.filter(c => c.code && c.code !== 'TBD');
+      let next = 0;
+      const worker = async () => {
+        while (next < queue.length) {
+          const court = queue[next++];
+          const availability = await fetchAvailability(court.code, SPORTS[selectedSport].type);
+          if (runId !== courtSearchRunId) return;
+          updateResultCard(court, availabilitySummaryForSelectedRange(availability, court), nearby);
+        }
+      };
+      await Promise.all([worker(), worker(), worker()]);
+    }
+
+    function renderCourtSearchResults(userLoc, errMsg) {
+      initBookingPrefsIfNeeded();
       const sport = SPORTS[selectedSport];
       const nearby = userLoc != null;
       const courts = nearby
         ? courtsWithDistances(userLoc.lat, userLoc.lng)
         : courtsForSelectedSport();
-      const items = courts.map((c, i) => {
-        const disabled = !c.code || c.code === 'TBD';
-        const right = disabled
-          ? '<span class="tag">setup needed</span>'
-          : (nearby
-              ? `<span class="pick-meta">${formatDist(c.dist)} <span class="pick-arrow">→</span></span>`
-              : '<span class="arrow">→</span>');
-        const hidden = nearby && i >= NEARBY_INITIAL_COUNT ? ' collapsed' : '';
-        // href="#" + JS preventDefault — tapping a court opens the date/time
-        // picker for that court rather than navigating directly to WebTrac.
-        return `
-          <a class="pick${disabled ? ' disabled' : ''}${hidden}" href="#" data-court-id="${c.id}">
-            <span class="pick-name">${c.name}</span>
-            ${right}
-          </a>`;
-      }).join('');
-
       const title = nearby
-        ? `Closest ${sport.label.toLowerCase()} courts`
-        : `Pick a ${sport.label.toLowerCase()} court`;
-      const sub = nearby
-        ? `<p class="perm-body" style="margin-bottom: 16px;">Here are some courts near you.</p>`
-        : '';
+        ? `${sport.label} near you`
+        : `${sport.label} courts`;
+      const summary = nearby
+        ? `Showing courts sorted by distance for ${formatBookingRange()}. Pick the best available court, not just the nearest one.`
+        : `Showing all ${sport.label.toLowerCase()} courts for ${formatBookingRange()}.`;
 
-      const showMoreBtn = (nearby && courts.length > NEARBY_INITIAL_COUNT)
-        ? `<button class="btn btn-ghost" id="showMoreBtn" style="margin-top: 14px;">Show more</button>`
-        : '';
-
-      const skipBtn = nearby
-        ? `<button class="btn btn-secondary" id="skipBtn">Continue to booking site</button>`
-        : '';
-
-      const ctaSection = nearby ? `
-        <div class="cta-divider">While you're here</div>
-        <div class="cta-list">${buildCtaListHtml()}</div>
-      ` : '';
-
+      const runId = ++courtSearchRunId;
       card.innerHTML = `
         ${backLinkHtml}
         ${sportIconSvg(selectedSport, false)}
         <h1>${title}</h1>
-        ${sub}
+        <div class="search-summary">${summary}</div>
         ${errMsg ? `<div class="error">${errMsg}</div>` : ''}
-        <div class="picker">${items}</div>
-        ${showMoreBtn}
-        ${skipBtn}
-        ${ctaSection}
+        <div class="result-list">
+          ${courts.map(c => resultCardHtml(c, nearby)).join('')}
+        </div>
+        <div class="results-toolbar">
+          <button class="btn btn-secondary" id="changeTimeBtn" type="button">Change time</button>
+          <a class="btn btn-ghost" id="manualAllBtn" href="${webtracAllCourtsUrl()}">WebTrac fallback</a>
+        </div>
       `;
 
-      // Tapping a court in the list now opens the date/time picker for that
-      // court (renderPostBooking). In v3 the primary action stays inside
-      // Courtside and calls the booking adapter.
-      card.querySelectorAll('a[data-court-id]').forEach(a => {
+      card.querySelectorAll('a[data-result-court-id]').forEach(a => {
         a.addEventListener('click', (e) => {
           e.preventDefault();
-          const courtId = a.dataset.courtId;
+          const courtId = a.dataset.resultCourtId;
           const court = courts.find(c => c.id === courtId);
           if (!court || !court.code || court.code === 'TBD') return;
-          track('court_selected_from_list', {
+          track('court_selected_from_results', {
             sport: selectedSport,
             court: courtId,
-            source: nearby ? 'nearby-list' : 'manual-list',
+            source: nearby ? 'nearby-availability' : 'all-availability',
           });
           renderPostBooking(court, userLoc);
         });
       });
 
-      // CTA click tracking
-      card.querySelectorAll('a[data-cta-id]').forEach(a => {
-        a.addEventListener('click', () => recordClick(a.dataset.ctaId));
+      document.getElementById('changeTimeBtn')?.addEventListener('click', () => renderTimeFirstSearch());
+      document.getElementById('manualAllBtn')?.addEventListener('click', () => {
+        track('manual_webtrac_all_opened', { sport: selectedSport });
       });
-
-      // Show more button reveals collapsed courts
-      const showMore = document.getElementById('showMoreBtn');
-      if (showMore) {
-        showMore.addEventListener('click', () => {
-          card.querySelectorAll('.pick.collapsed').forEach(el => el.classList.remove('collapsed'));
-          showMore.style.display = 'none';
-        });
-      }
-
-      // "Just take me to the booking site" — opens WebTrac with all courts of this sport
-      const skip = document.getElementById('skipBtn');
-      if (skip) {
-        skip.addEventListener('click', () => { location.href = webtracAllCourtsUrl(); });
-      }
-
       wireBackLink();
+      loadCourtSearchAvailability(courts, nearby, runId);
+    }
+
+    function renderFallback(errMsg, userLoc) {
+      renderCourtSearchResults(userLoc || null, errMsg);
     }
 
     // -------------------- Main --------------------
