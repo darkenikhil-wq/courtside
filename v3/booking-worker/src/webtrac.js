@@ -601,6 +601,7 @@ function expectedCartMatch(cartText, booking) {
       courtCode: booking.courtCode || null,
       courtUnitName: booking.courtUnitName || null,
       courtUnitDisplayName: booking.courtUnitDisplayName || null,
+      webtracFacilityId: booking.webtracFacilityId || null,
       date: booking.date || null,
       start: booking.start || null,
       end: booking.end || null,
@@ -628,6 +629,7 @@ function courtUnitTerms(booking) {
     booking.courtUnitName,
     booking.courtUnitDisplayName,
     booking.courtUnitId,
+    booking.webtracFacilityId,
   ]);
   const terms = [...rawTerms];
   for (const value of rawTerms) {

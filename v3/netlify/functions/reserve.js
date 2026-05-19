@@ -166,6 +166,7 @@ function bookingSummary(body) {
     courtUnitId: body.courtUnitId || null,
     courtUnitName: body.courtUnitName || null,
     courtUnitDisplayName: body.courtUnitDisplayName || null,
+    webtracFacilityId: body.webtracFacilityId || null,
     sport: body.sport || null,
     sportType: body.sportType || null,
     date: body.date || null,

@@ -1599,6 +1599,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         ? data.courts.map((unit, index) => ({
             id: String(unit.id || `court-${index + 1}`),
             label: String(unit.label || `Court ${index + 1}`),
+            webtracFacilityId: unit.webtracFacilityId || null,
             slots: Array.isArray(unit.slots) ? unit.slots : [],
           })).filter(unit => unit.slots.length)
         : [];
@@ -1789,6 +1790,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         id: active.dataset.courtUnitId || null,
         label: active.dataset.courtUnitLabel || active.textContent.trim(),
         displayLabel: active.dataset.courtUnitDisplay || active.textContent.trim(),
+        webtracFacilityId: active.dataset.webtracFacilityId || null,
       };
     }
 
@@ -1840,6 +1842,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                   data-court-unit-id="${escapeHtml(unit.id)}"
                   data-court-unit-label="${escapeHtml(unit.label)}"
                   data-court-unit-display="${escapeHtml(display)}"
+                  data-webtrac-facility-id="${escapeHtml(unit.webtracFacilityId || '')}"
                   aria-pressed="${active}">
             <span class="court-unit-name">${escapeHtml(display)}</span>
             <span class="court-unit-meta">${escapeHtml(availabilitySummaryForUnit(unit))}</span>
@@ -1968,6 +1971,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         courtUnitId: courtUnit && courtUnit.id,
         courtUnitName: courtUnit && courtUnit.label,
         courtUnitDisplayName: courtUnit && courtUnit.displayLabel,
+        webtracFacilityId: courtUnit && courtUnit.webtracFacilityId,
         sport: selectedSport,
         sportType: SPORTS[selectedSport].type,
         date: bookingPrefs.date,
