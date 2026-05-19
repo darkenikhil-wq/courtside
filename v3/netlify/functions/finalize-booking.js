@@ -212,6 +212,16 @@ function summarizeWebtrac(webtrac) {
     confirmation: webtrac.confirmation || null,
     recaptcha: webtrac.recaptcha || null,
     requiresFinalPaymentGuard: webtrac.requiresFinalPaymentGuard || false,
+    allowWebtracFinalPayment: webtrac.allowWebtracFinalPayment === true,
+    missing: webtrac.missing || null,
+    fillResult: webtrac.fillResult || null,
+    cart: webtrac.cart ? {
+      confirmed: webtrac.cart.confirmed,
+      itemCount: webtrac.cart.itemCount,
+      amountToday: webtrac.cart.amountToday,
+      grandTotal: webtrac.cart.grandTotal,
+      expectedMatch: webtrac.cart.expectedMatch || null,
+    } : null,
   };
 }
 

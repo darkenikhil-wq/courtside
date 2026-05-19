@@ -2255,6 +2255,22 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           return;
         }
 
+        setPaymentStatus(paymentStatusEl, 'Checking Arlington/WebTrac checkout...', '');
+        const preflight = await preflightWebtracCheckout(bookingPayload);
+        if (!preflight.ready) {
+          setPaymentStatus(paymentStatusEl, preflight.message || 'Arlington/WebTrac checkout is not ready yet.', 'warn');
+          return;
+        }
+        if (preflight.webtrac?.allowWebtracFinalPayment !== true) {
+          setPaymentStatus(
+            paymentStatusEl,
+            'Arlington/WebTrac checkout is ready, but final WebTrac payment is still disabled. No card authorization was created.',
+            'warn'
+          );
+          return;
+        }
+
+        setPaymentStatus(paymentStatusEl, 'Preparing secure payment...', '');
         const intentRes = await fetch('/.netlify/functions/create-payment-intent', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -2291,9 +2307,75 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           payBtn.disabled = false;
           payBtn.onclick = () => confirmStripePayment(payBtn, paymentStatusEl);
         }
-        setPaymentStatus(paymentStatusEl, 'Secure payment is ready. Your card is authorized first, then captured only after Arlington/WebTrac confirms.', '');
+        setPaymentStatus(
+          paymentStatusEl,
+          config.mode === 'live'
+            ? 'Live payment is ready. Your card is authorized first, then captured only after Arlington/WebTrac confirms.'
+            : 'Secure payment is ready. Your card is authorized first, then captured only after Arlington/WebTrac confirms.',
+          ''
+        );
       } catch (e) {
         setPaymentStatus(paymentStatusEl, e.message || 'Could not prepare payment.', 'warn');
+      }
+    }
+
+    async function preflightWebtracCheckout(bookingPayload) {
+      const localWorker = localBookingWorkerConfig();
+      if (localWorker?.url) {
+        return preflightWithLocalWorker(bookingPayload, localWorker);
+      }
+
+      try {
+        const res = await fetch('/.netlify/functions/checkout-preflight', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ booking: bookingPayload }),
+        });
+        const data = await res.json().catch(() => ({}));
+        const ready = res.ok && data.status === 'ready';
+        const guardOff = ready && data.webtrac?.allowWebtracFinalPayment !== true;
+        return {
+          ready,
+          code: data.code,
+          message: guardOff
+            ? 'Arlington/WebTrac checkout is ready, but final WebTrac payment is still disabled. No card authorization was created.'
+            : data.message,
+          webtrac: data.webtrac,
+        };
+      } catch (e) {
+        return {
+          ready: false,
+          code: 'WEBTRAC_PREFLIGHT_UNREACHABLE',
+          message: 'Final booking service is not reachable. No card authorization was created.',
+        };
+      }
+    }
+
+    async function preflightWithLocalWorker(bookingPayload, localWorker) {
+      const finalizeUrl = localWorkerFinalizeUrl(localWorker.url);
+      const headers = { 'Content-Type': 'application/json' };
+      if (localWorker.token) headers.Authorization = `Bearer ${localWorker.token}`;
+
+      try {
+        const res = await fetch(finalizeUrl, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ booking: bookingPayload, stopBeforeSubmit: true }),
+        });
+        const webtrac = await res.json().catch(() => ({}));
+        webtrac.httpStatus = res.status;
+        return {
+          ready: res.ok && webtrac.status === 'webtrac_payment_ready',
+          code: webtrac.code,
+          message: webtrac.message,
+          webtrac,
+        };
+      } catch (e) {
+        return {
+          ready: false,
+          code: 'WEBTRAC_PREFLIGHT_UNREACHABLE',
+          message: e.message || 'Local final booking service is not reachable.',
+        };
       }
     }
 

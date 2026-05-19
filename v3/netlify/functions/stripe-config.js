@@ -10,6 +10,7 @@ exports.handler = async () => {
 
   return jsonResponse(200, {
     publishableKey,
+    mode: publishableKey.startsWith('pk_live_') ? 'live' : 'test',
   });
 };
 
