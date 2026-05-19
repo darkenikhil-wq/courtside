@@ -399,7 +399,7 @@ function checkoutMarkers(text, controls, url) {
   return {
     cartEmpty: /cart\s*\(0\s+items?\)|cart\s+is\s+empty|no\s+items\s+in\s+your\s+cart/i.test(combined),
     hasCartItem: /cart\s*\([1-9]\d*\s+items?\)|Remove.{0,500}\$\s*[0-9,.]+|Facility\s+Reservation.{0,500}\$\s*[0-9,.]+/i.test(combined),
-    hasProceedToCheckout: /proceed\s+to\s+checkout/i.test(combined),
+    hasProceedToCheckout: /proceed\s+to\s+checkout/i.test(labelText),
     hasContinue: /\bcontinue\b|\bnext\b/i.test(labelText),
     hasPaymentPrompt: /payment\s+method|credit\s+card|card\s+number|select\s+a\s+payment|security\s+code|expiration\s+date/i.test(combined),
     hasFinalPaymentAction: /submit\s+payment|complete\s+(order|transaction)|place\s+order|make\s+payment|process\s+payment|confirm\s+(and\s+)?pay|purchase/i.test(combined),
@@ -408,8 +408,9 @@ function checkoutMarkers(text, controls, url) {
 
 function checkoutStopReason(markers) {
   if (markers.cartEmpty) return 'empty_cart';
-  if (markers.hasPaymentPrompt) return 'payment_page';
+  if (markers.hasProceedToCheckout) return null;
   if (markers.hasFinalPaymentAction) return 'final_payment_action';
+  if (markers.hasPaymentPrompt) return 'payment_page';
   return null;
 }
 
