@@ -113,6 +113,31 @@ The worker also checks the WebTrac cart against the requested court, date, start
 and end time before showing payment or finalizing checkout. If the cart looks
 like an earlier test, it stops before payment with `WEBTRAC_CART_MISMATCH`.
 
+## Cloud worker
+
+The local worker was useful for reverse-engineering WebTrac, but it should not
+be the production runtime. Use GitHub as the source of truth, then deploy this
+folder as a Docker web service on Render, Fly, Railway, or another small VM.
+
+This folder includes:
+
+- `Dockerfile`: Playwright/Chromium runtime for the worker.
+- `render.yaml`: Render blueprint with safe defaults and secret placeholders.
+
+For Render:
+
+1. Create a new Blueprint or Web Service from the GitHub repo.
+2. Set the root directory to `v3/booking-worker`.
+3. Use Docker runtime.
+4. Add the secret env vars from `.env.example` in Render, not in GitHub.
+5. Keep `ALLOW_WEBTRAC_FINAL_PAYMENT=false` until cart matching and payment
+   filling have been tested from the cloud worker.
+
+Cloud default is `HEADLESS=true`. If WebTrac presents reCAPTCHA, the worker will
+stop before final payment with `WEBTRAC_RECAPTCHA_REQUIRED`; do not try to bypass
+it. A production-grade version may need a hosted browser with a live operator
+view if WebTrac requires interactive verification.
+
 ## Connecting v3
 
 For local testing, expose this service or run a small tunnel, then set the v3
@@ -121,6 +146,15 @@ Netlify function environment variables:
 ```text
 WEBTRAC_BOOKING_ADAPTER_URL=http://localhost:8787/reserve
 WEBTRAC_BOOKING_ADAPTER_TOKEN=<same as BOOKING_WORKER_TOKEN>
+```
+
+For the cloud worker, replace the local URL with the hosted worker URL:
+
+```text
+WEBTRAC_BOOKING_ADAPTER_URL=https://<worker-host>/reserve
+WEBTRAC_BOOKING_ADAPTER_TOKEN=<same as BOOKING_WORKER_TOKEN>
+WEBTRAC_FINALIZE_ADAPTER_URL=https://<worker-host>/checkout/finalize
+WEBTRAC_FINALIZE_ADAPTER_TOKEN=<same as BOOKING_WORKER_TOKEN>
 ```
 
 The finalizer function derives the checkout URL from the reserve URL above. You

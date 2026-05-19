@@ -1,0 +1,48 @@
+services:
+  - type: web
+    name: courtside-booking-worker
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 8787
+      - key: HEADLESS
+        value: true
+      - key: DRY_RUN
+        value: false
+      - key: PLAYWRIGHT_ARTIFACT_DIR
+        value: /tmp/courtside-playwright
+      - key: WEBTRAC_CLEAR_CART_BEFORE_RESERVE
+        value: true
+      - key: ALLOW_WEBTRAC_FINAL_PAYMENT
+        value: false
+      - key: BOOKING_WORKER_TOKEN
+        sync: false
+      - key: WEBTRAC_USERNAME
+        sync: false
+      - key: WEBTRAC_PASSWORD
+        sync: false
+      - key: WEBTRAC_BILL_FIRST_NAME
+        sync: false
+      - key: WEBTRAC_BILL_LAST_NAME
+        sync: false
+      - key: WEBTRAC_BILL_PHONE
+        sync: false
+      - key: WEBTRAC_BILL_EMAIL
+        sync: false
+      - key: WEBTRAC_CARD_NAME
+        sync: false
+      - key: WEBTRAC_BILL_ADDRESS1
+        sync: false
+      - key: WEBTRAC_BILL_POSTAL_CODE
+        sync: false
+      - key: WEBTRAC_CARD_NUMBER
+        sync: false
+      - key: WEBTRAC_CARD_EXP
+        sync: false
+      - key: WEBTRAC_CARD_CVC
+        sync: false

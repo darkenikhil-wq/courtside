@@ -1,0 +1,6 @@
+.env
+.playwright-artifacts
+node_modules
+npm-debug.log*
+Dockerfile
+README.md
