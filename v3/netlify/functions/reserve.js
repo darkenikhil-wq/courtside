@@ -65,24 +65,25 @@ exports.handler = async (event) => {
   }
 
   try {
-    const headers = { 'Content-Type': 'application/json' };
-    if (process.env.WEBTRAC_BOOKING_ADAPTER_TOKEN) {
-      headers.Authorization = `Bearer ${process.env.WEBTRAC_BOOKING_ADAPTER_TOKEN}`;
+    const headers = adapterHeaders();
+    const bodyText = JSON.stringify(adapterRequestBody(body));
+    const startUrl = adapterStartUrl(adapterUrl);
+    const startRes = await fetch(startUrl, {
+      method: 'POST',
+      headers,
+      body: bodyText,
+    });
+    if (startRes.status !== 404 && startRes.status !== 405) {
+      const payload = await adapterPayload(startRes);
+      return jsonResponse(startRes.status, payload);
     }
+
     const res = await fetch(adapterUrl, {
       method: 'POST',
       headers,
-      body: JSON.stringify({
-        ...body,
-        rules: publicRules(),
-        webtracUpdateSelectionUrls: normalizeSelectionUrls(body),
-        requestedAt: Date.now(),
-      }),
+      body: bodyText,
     });
-    const text = await res.text();
-    let payload;
-    try { payload = JSON.parse(text); }
-    catch (e) { payload = { status: res.ok ? 'accepted' : 'adapter_error', message: text }; }
+    const payload = await adapterPayload(res);
     return jsonResponse(res.status, payload);
   } catch (e) {
     return jsonResponse(502, {
@@ -175,6 +176,48 @@ function bookingSummary(body) {
     duration: Number(body.duration),
     selectionUrlCount: normalizeSelectionUrls(body).length,
   };
+}
+
+function adapterHeaders() {
+  const headers = { 'Content-Type': 'application/json' };
+  if (process.env.WEBTRAC_BOOKING_ADAPTER_TOKEN) {
+    headers.Authorization = `Bearer ${process.env.WEBTRAC_BOOKING_ADAPTER_TOKEN}`;
+  }
+  return headers;
+}
+
+function adapterRequestBody(body) {
+  return {
+    ...body,
+    rules: publicRules(),
+    webtracUpdateSelectionUrls: normalizeSelectionUrls(body),
+    requestedAt: Date.now(),
+  };
+}
+
+function adapterStartUrl(adapterUrl) {
+  if (process.env.WEBTRAC_BOOKING_ADAPTER_START_URL) {
+    return process.env.WEBTRAC_BOOKING_ADAPTER_START_URL;
+  }
+  try {
+    const url = new URL(adapterUrl);
+    url.pathname = url.pathname.replace(/\/reserve\/?$/, '/reserve/start');
+    if (!/\/reserve\/start\/?$/.test(url.pathname)) {
+      url.pathname = `${url.pathname.replace(/\/$/, '')}/reserve/start`;
+    }
+    return url.toString();
+  } catch (e) {
+    return adapterUrl;
+  }
+}
+
+async function adapterPayload(res) {
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    return { status: res.ok ? 'accepted' : 'adapter_error', message: text };
+  }
 }
 
 function fail(code, message) {

@@ -2501,9 +2501,16 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           headers,
           body: JSON.stringify(payload),
         });
-        const data = await res.json().catch(() => ({}));
+        let data = await res.json().catch(() => ({}));
+        let responseOk = res.ok;
 
-        if (res.ok && ['confirmed', 'qa_accepted', 'dry_run_ready', 'cart_updated'].includes(data.status)) {
+        if (responseOk && data.status === 'booking_started' && data.jobId) {
+          const polled = await pollBookingJob(data.jobId);
+          data = polled.data;
+          responseOk = polled.ok;
+        }
+
+        if (responseOk && ['confirmed', 'qa_accepted', 'dry_run_ready', 'cart_updated'].includes(data.status)) {
           progress.stop();
           const cartReady = data.status === 'cart_updated';
           const terminalBookingState = cartReady || data.status === 'confirmed';
@@ -2559,6 +2566,33 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           buttonEl.hidden = false;
         }
       }
+    }
+
+    async function pollBookingJob(jobId) {
+      const maxAttempts = 75;
+      let lastData = null;
+      let lastOk = false;
+      for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+        await new Promise(resolve => setTimeout(resolve, attempt === 0 ? 1200 : 2000));
+        const res = await fetch(`/.netlify/functions/reserve-status?jobId=${encodeURIComponent(jobId)}`, {
+          headers: { 'Cache-Control': 'no-store' },
+        });
+        const data = await res.json().catch(() => ({}));
+        lastData = data;
+        lastOk = res.ok;
+        if (data.status !== 'booking_running' && data.code !== 'WEBTRAC_BOOKING_RUNNING') {
+          return { ok: res.ok, data };
+        }
+      }
+      return {
+        ok: false,
+        data: {
+          status: 'worker_timeout',
+          code: 'WEBTRAC_BOOKING_STATUS_TIMEOUT',
+          message: lastData?.message || 'Courtside is still waiting on WebTrac. Try checking again in a moment.',
+          lastOk,
+        },
+      };
     }
 
     // -------------------- Views --------------------
