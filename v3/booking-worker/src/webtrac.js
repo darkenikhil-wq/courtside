@@ -1708,7 +1708,7 @@ async function completeCartPrompts(page, payload) {
     }
 
     const looksLikeHeadcount = /facility\s*head\s*count|head\s*count|number\s+attending|participants?|attendees?/i.test(compact);
-    const looksLikeAgreement = /agree\s+to\s+the\s+above|i\s+agree|acknowledge|waiver|facility\s+rules|rental\s+policy|refund\s+policy/i.test(compact);
+    const looksLikeAgreement = /tennis\s+and\s+pickleball\s+agreements?|agree\s+to\s+the\s+above|i\s+agree|acknowledge|waiver|facility\s+rules|rental\s+policy|refund\s+policy/i.test(compact);
     const fillResult = looksLikeHeadcount ? await fillHeadcountFields(page, headcount) : { filled: 0 };
     const agreementResult = looksLikeAgreement ? await checkAgreementFields(page) : { checked: 0 };
     const clickResult = await clickSafeCartContinue(page, looksLikeHeadcount || looksLikeAgreement || onAddToCartPage);
@@ -1761,7 +1761,7 @@ async function checkAgreementFields(page) {
     const candidates = checkboxes.filter((el) => {
       if (el.disabled || el.checked) return false;
       const text = contextText(el);
-      return /agree|above|acknowledge|required|waiver|policy|rules|terms/i.test(text)
+      return /tennis\s+and\s+pickleball|agree|above|acknowledge|required|waiver|policy|rules|terms/i.test(text)
         || (checkboxes.length === 1 && (visible(el) || /addtocart/i.test(location.href)));
     });
 

@@ -9,7 +9,10 @@ const browserlessProxyCountry = process.env.BROWSERLESS_PROXY_COUNTRY || '';
 const browserlessProxyCity = process.env.BROWSERLESS_PROXY_CITY || '';
 const browserlessProxySticky = process.env.BROWSERLESS_PROXY_STICKY || '';
 const browserlessProxyPreset = process.env.BROWSERLESS_PROXY_PRESET || '';
-const browserlessTimeoutMs = Number(process.env.BROWSERLESS_TIMEOUT_MS || 300000);
+const browserlessTimeoutSeconds = normalizeBrowserlessTimeoutSeconds(
+  process.env.BROWSERLESS_TIMEOUT_SECONDS,
+  process.env.BROWSERLESS_TIMEOUT_MS,
+);
 const explicitBrowserEndpoint = process.env.PLAYWRIGHT_WS_ENDPOINT || process.env.BROWSER_WS_ENDPOINT || '';
 
 export const config = {
@@ -29,6 +32,7 @@ export const config = {
     : browserlessToken
       ? `remote:browserless:${browserlessStealth ? 'stealth' : 'standard'}`
       : 'local',
+  browserlessTimeoutSeconds,
   artifactDir: process.env.PLAYWRIGHT_ARTIFACT_DIR || new URL('../.playwright-artifacts', import.meta.url).pathname,
   reserveJobStoreDir: process.env.RESERVE_JOB_STORE_DIR || '/tmp/courtside-reserve-jobs',
   clearCartBeforeReserve: process.env.WEBTRAC_CLEAR_CART_BEFORE_RESERVE !== 'false',
@@ -52,8 +56,8 @@ function browserlessEndpoint() {
   if (!browserlessToken) return '';
   const route = normalizeBrowserlessRoute(browserlessRoute);
   const params = new URLSearchParams({ token: browserlessToken });
-  if (Number.isFinite(browserlessTimeoutMs) && browserlessTimeoutMs > 0) {
-    params.set('timeout', String(browserlessTimeoutMs));
+  if (Number.isFinite(browserlessTimeoutSeconds) && browserlessTimeoutSeconds > 0) {
+    params.set('timeout', String(browserlessTimeoutSeconds));
   }
   addBrowserlessParam(params, 'proxy', browserlessProxy);
   addBrowserlessParam(params, 'proxyCountry', browserlessProxyCountry);
@@ -65,6 +69,18 @@ function browserlessEndpoint() {
 
 function normalizeBrowserlessRoute(route) {
   return String(route || 'stealth').replace(/^\/+/, '').replace(/\/+$/, '') || 'stealth';
+}
+
+function normalizeBrowserlessTimeoutSeconds(secondsValue, msValue) {
+  const explicitSeconds = Number(secondsValue);
+  if (Number.isFinite(explicitSeconds) && explicitSeconds > 0) {
+    return Math.min(Math.max(Math.round(explicitSeconds), 1), 60000);
+  }
+
+  const legacyMs = Number(msValue || 300000);
+  const converted = legacyMs > 60000 ? legacyMs / 1000 : legacyMs;
+  if (!Number.isFinite(converted) || converted <= 0) return 300;
+  return Math.min(Math.max(Math.round(converted), 1), 60000);
 }
 
 function addBrowserlessParam(params, name, value) {

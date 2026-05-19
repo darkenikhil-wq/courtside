@@ -27,8 +27,9 @@ app.get('/health', (req, res) => {
     browserProfile: 'browser-like-v1',
     browserRuntime: config.browserRuntimeLabel,
     browserConnectMode: config.browserConnectMode,
+    browserlessTimeoutSeconds: config.browserlessTimeoutSeconds,
     reserveJobStore: RESERVE_JOB_STORE_DIR,
-    workerBuild: 'live-cart-resilience-v1',
+    workerBuild: 'browserless-timeout-agreement-v1',
   });
 });
 

@@ -22,8 +22,8 @@ services:
         value: cdp
       - key: PLAYWRIGHT_CONNECT_TIMEOUT_MS
         value: 60000
-      - key: BROWSERLESS_TIMEOUT_MS
-        value: 300000
+      - key: BROWSERLESS_TIMEOUT_SECONDS
+        value: 300
       - key: WEBTRAC_CLEAR_CART_BEFORE_RESERVE
         value: true
       - key: ALLOW_WEBTRAC_FINAL_PAYMENT
