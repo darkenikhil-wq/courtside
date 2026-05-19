@@ -1022,6 +1022,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       gap: 10px;
       margin-top: 14px;
     }
+    .show-more-results {
+      margin-top: 12px;
+      margin-bottom: 0;
+    }
     .results-toolbar .btn { margin-bottom: 0; }
     .error {
       color: var(--error);
@@ -1845,6 +1849,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           tone: 'warn',
           label: 'Check manually',
           detail: `Live availability did not load for ${formatBookingRange()}.`,
+          rankBucket: 2,
+          openCount: 0,
+          totalCount: 0,
+          availabilityRatio: 0,
         };
       }
 
@@ -1861,12 +1869,20 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             tone: 'open',
             label: `${openUnits.length}/${normalized.courts.length} open`,
             detail: `${unitNames}${more} at ${formatBookingRange()}`,
+            rankBucket: 0,
+            openCount: openUnits.length,
+            totalCount: normalized.courts.length,
+            availabilityRatio: openUnits.length / normalized.courts.length,
           };
         }
         return {
           tone: 'full',
           label: 'Full',
           detail: `No courts open at ${formatBookingRange()}`,
+          rankBucket: 3,
+          openCount: 0,
+          totalCount: normalized.courts.length,
+          availabilityRatio: 0,
         };
       }
 
@@ -1878,6 +1894,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           detail: open
             ? `Available at ${formatBookingRange()}`
             : `Unavailable at ${formatBookingRange()}`,
+          rankBucket: open ? 0 : 3,
+          openCount: open ? 1 : 0,
+          totalCount: 1,
+          availabilityRatio: open ? 1 : 0,
         };
       }
 
@@ -1885,6 +1905,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         tone: 'warn',
         label: 'Manual check',
         detail: `No detailed availability came back for ${formatBookingRange()}.`,
+        rankBucket: 2,
+        openCount: 0,
+        totalCount: 0,
+        availabilityRatio: 0,
       };
     }
 
@@ -4097,38 +4121,114 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     let courtSearchRunId = 0;
+    const RESULT_COLLAPSED_LIMIT = 5;
 
-    function resultCardHtml(court, nearby) {
+    function initialResultSummaryForCourt(court) {
       const disabled = !court.code || court.code === 'TBD';
+      if (disabled) {
+        return {
+          tone: 'warn',
+          label: 'Setup',
+          detail: 'WebTrac setup needed',
+          rankBucket: 4,
+          openCount: 0,
+          totalCount: court.numCourts || 0,
+          availabilityRatio: 0,
+        };
+      }
+      return {
+        tone: 'checking',
+        label: 'Checking',
+        detail: `Checking ${formatBookingRange()}`,
+        rankBucket: 1,
+        openCount: 0,
+        totalCount: court.numCourts || 0,
+        availabilityRatio: 0,
+      };
+    }
+
+    function resultMetaText(court, summary, nearby) {
       const distance = nearby && typeof court.dist === 'number' ? `${formatDist(court.dist)} away` : '';
-      const meta = [
-        distance,
-        court.numCourts ? `${court.numCourts} courts` : '',
-        disabled ? 'WebTrac setup needed' : `Checking ${formatBookingRange()}`,
-      ].filter(Boolean).join(' · ');
+      return [distance, summary.detail].filter(Boolean).join(' · ');
+    }
+
+    function availabilityRankBucket(summary) {
+      if (Number.isFinite(summary && summary.rankBucket)) return summary.rankBucket;
+      if (summary && summary.tone === 'open') return 0;
+      if (summary && summary.tone === 'warn') return 2;
+      if (summary && summary.tone === 'full') return 3;
+      return 1;
+    }
+
+    function compareResultStates(a, b, nearby) {
+      const bucketDelta = availabilityRankBucket(a.summary) - availabilityRankBucket(b.summary);
+      if (bucketDelta) return bucketDelta;
+
+      if (nearby) {
+        const distA = typeof a.court.dist === 'number' ? a.court.dist : Number.POSITIVE_INFINITY;
+        const distB = typeof b.court.dist === 'number' ? b.court.dist : Number.POSITIVE_INFINITY;
+        const distanceDelta = distA - distB;
+        if (Math.abs(distanceDelta) > 0.001) return distanceDelta;
+      }
+
+      const ratioDelta = (b.summary.availabilityRatio || 0) - (a.summary.availabilityRatio || 0);
+      if (Math.abs(ratioDelta) > 0.001) return ratioDelta;
+
+      const openDelta = (b.summary.openCount || 0) - (a.summary.openCount || 0);
+      if (openDelta) return openDelta;
+
+      return a.court.name.localeCompare(b.court.name) || a.index - b.index;
+    }
+
+    function rerankResultCards(resultStates, nearby) {
+      const list = card.querySelector('.result-list');
+      if (!list || !resultStates) return;
+      const orderedStates = Array.from(resultStates.values())
+        .sort((a, b) => compareResultStates(a, b, nearby));
+
+      orderedStates.forEach((state, index) => {
+        const node = list.querySelector(`[data-result-court-id="${state.court.id}"]`);
+        if (!node) return;
+        node.hidden = !resultStates.expanded && index >= RESULT_COLLAPSED_LIMIT;
+        list.appendChild(node);
+      });
+
+      const showMoreBtn = document.getElementById('showMoreResultsBtn');
+      if (!showMoreBtn) return;
+      const hiddenCount = Math.max(0, orderedStates.length - RESULT_COLLAPSED_LIMIT);
+      showMoreBtn.hidden = resultStates.expanded || hiddenCount === 0;
+      showMoreBtn.textContent = `Show ${hiddenCount} more courts`;
+    }
+
+    function resultCardHtml(court, nearby, summary = initialResultSummaryForCourt(court)) {
+      const disabled = !court.code || court.code === 'TBD';
+      const meta = resultMetaText(court, summary, nearby);
       return `
         <a class="result-card${disabled ? ' disabled' : ''}" href="#" data-result-court-id="${court.id}">
           <span class="result-main">
             <span class="result-name">${escapeHtml(court.name)}</span>
             <span class="result-meta" data-result-meta="${court.id}">${escapeHtml(meta)}</span>
           </span>
-          <span class="result-status${disabled ? ' warn' : ''}" data-result-status="${court.id}">
-            ${disabled ? 'Setup' : 'Checking'}
+          <span class="result-status ${summary.tone || ''}" data-result-status="${court.id}">
+            ${escapeHtml(summary.label)}
           </span>
         </a>`;
     }
 
-    function updateResultCard(court, summary, nearby) {
+    function updateResultCard(court, summary, nearby, resultStates) {
       const statusEl = card.querySelector(`[data-result-status="${court.id}"]`);
       const metaEl = card.querySelector(`[data-result-meta="${court.id}"]`);
       if (!statusEl || !metaEl) return;
       statusEl.className = `result-status ${summary.tone || ''}`.trim();
       statusEl.textContent = summary.label;
-      const distance = nearby && typeof court.dist === 'number' ? `${formatDist(court.dist)} away` : '';
-      metaEl.textContent = [distance, summary.detail].filter(Boolean).join(' · ');
+      metaEl.textContent = resultMetaText(court, summary, nearby);
+      if (resultStates && resultStates.has(court.id)) {
+        resultStates.get(court.id).summary = summary;
+        rerankResultCards(resultStates, nearby);
+      }
     }
 
-    async function loadCourtSearchAvailability(courts, nearby, runId) {
+    async function loadCourtSearchAvailability(courts, nearby, runId, resultStates) {
       const queue = courts.filter(c => c.code && c.code !== 'TBD');
       let next = 0;
       const worker = async () => {
@@ -4136,7 +4236,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           const court = queue[next++];
           const availability = await fetchAvailability(court.code, SPORTS[selectedSport].type);
           if (runId !== courtSearchRunId) return;
-          updateResultCard(court, availabilitySummaryForSelectedRange(availability, court), nearby);
+          updateResultCard(court, availabilitySummaryForSelectedRange(availability, court), nearby, resultStates);
         }
       };
       await Promise.all([worker(), worker(), worker()]);
@@ -4149,12 +4249,21 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const courts = nearby
         ? courtsWithDistances(userLoc.lat, userLoc.lng)
         : courtsForSelectedSport();
+      const resultStates = new Map(courts.map((court, index) => [
+        court.id,
+        {
+          court,
+          index,
+          summary: initialResultSummaryForCourt(court),
+        },
+      ]));
+      resultStates.expanded = courts.length <= RESULT_COLLAPSED_LIMIT;
       const title = nearby
         ? `${sport.label} near you`
         : `${sport.label} courts`;
       const summary = nearby
-        ? `Showing courts sorted by distance for ${formatBookingRange()}. Pick the best available court, not just the nearest one.`
-        : `Showing all ${sport.label.toLowerCase()} courts for ${formatBookingRange()}.`;
+        ? `Ranking available courts first, then nearest options for ${formatBookingRange()}.`
+        : `Ranking available ${sport.label.toLowerCase()} courts first for ${formatBookingRange()}.`;
 
       const runId = ++courtSearchRunId;
       card.innerHTML = `
@@ -4164,8 +4273,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         <div class="search-summary">${summary}</div>
         ${errMsg ? `<div class="error">${errMsg}</div>` : ''}
         <div class="result-list">
-          ${courts.map(c => resultCardHtml(c, nearby)).join('')}
+          ${courts.map(c => resultCardHtml(c, nearby, resultStates.get(c.id).summary)).join('')}
         </div>
+        <button class="btn btn-secondary show-more-results" id="showMoreResultsBtn" type="button" hidden>Show more courts</button>
         <div class="results-toolbar">
           <button class="btn btn-secondary" id="changeTimeBtn" type="button">Change time</button>
           <a class="btn btn-ghost" id="manualAllBtn" href="${webtracAllCourtsUrl()}">WebTrac fallback</a>
@@ -4187,12 +4297,21 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         });
       });
 
+      document.getElementById('showMoreResultsBtn')?.addEventListener('click', () => {
+        resultStates.expanded = true;
+        rerankResultCards(resultStates, nearby);
+        track('court_results_expanded', {
+          sport: selectedSport,
+          source: nearby ? 'nearby-availability' : 'all-availability',
+        });
+      });
       document.getElementById('changeTimeBtn')?.addEventListener('click', () => renderTimeFirstSearch());
       document.getElementById('manualAllBtn')?.addEventListener('click', () => {
         track('manual_webtrac_all_opened', { sport: selectedSport });
       });
       wireBackLink();
-      loadCourtSearchAvailability(courts, nearby, runId);
+      rerankResultCards(resultStates, nearby);
+      loadCourtSearchAvailability(courts, nearby, runId, resultStates);
     }
 
     function renderFallback(errMsg, userLoc) {
