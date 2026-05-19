@@ -33,7 +33,7 @@ app.get('/health', (req, res) => {
     browserlessTimeoutSeconds: config.browserlessTimeoutSeconds,
     browserlessProxyEnabled: config.browserlessProxyEnabled,
     reserveJobStore: RESERVE_JOB_STORE_DIR,
-    workerBuild: 'render-local-chromium-v1',
+    workerBuild: 'render-local-chromium-v2',
   });
 });
 
