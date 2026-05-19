@@ -2,7 +2,7 @@ import express from 'express';
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { config, assertRuntimeConfig } from './config.js';
+import { config, assertRuntimeConfig, paymentEnvStatus, requiredEnvStatus } from './config.js';
 import { validateBookingRequest } from './validation.js';
 import { finalizeWebtracCheckout, inspectCheckoutFlow, reserveWithWebtrac } from './webtrac.js';
 
@@ -21,6 +21,8 @@ app.use((req, res, next) => {
 app.use(express.json({ limit: '128kb' }));
 
 app.get('/health', (req, res) => {
+  const requiredMissing = requiredEnvStatus().filter((item) => !item.ok).map((item) => item.name);
+  const paymentMissing = paymentEnvStatus().filter((item) => !item.ok).map((item) => item.name);
   res.json({
     ok: true,
     dryRun: config.dryRun,
@@ -34,7 +36,12 @@ app.get('/health', (req, res) => {
     browserlessTimeoutSeconds: config.browserlessTimeoutSeconds,
     browserlessProxyEnabled: config.browserlessProxyEnabled,
     reserveJobStore: RESERVE_JOB_STORE_DIR,
-    workerBuild: 'persistent-webtrac-session-v1',
+    requiredEnvConfigured: requiredMissing.length === 0,
+    requiredMissingEnv: requiredMissing,
+    allowWebtracFinalPayment: config.allowWebtracFinalPayment,
+    paymentProfileConfigured: paymentMissing.length === 0,
+    paymentMissingEnv: paymentMissing,
+    workerBuild: 'payment-readiness-health-v1',
   });
 });
 
