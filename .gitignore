@@ -2,3 +2,7 @@
 Thumbs.db
 .netlify/
 node_modules/
+.playwright-artifacts/
+.env
+.env.*
+!.env.example
