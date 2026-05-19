@@ -43,9 +43,9 @@ services:
       - key: BROWSERLESS_REGION
         value: sfo
       - key: BROWSERLESS_ROUTE
-        value: stealth
+        value: chrome
       - key: BROWSERLESS_STEALTH
-        value: true
+        value: false
       - key: BROWSERLESS_PROXY_ENABLED
         value: false
       - key: BROWSERLESS_PROXY

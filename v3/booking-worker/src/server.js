@@ -31,7 +31,7 @@ app.get('/health', (req, res) => {
     browserlessTimeoutSeconds: config.browserlessTimeoutSeconds,
     browserlessProxyEnabled: config.browserlessProxyEnabled,
     reserveJobStore: RESERVE_JOB_STORE_DIR,
-    workerBuild: 'browserless-proxy-opt-in-v1',
+    workerBuild: 'browserless-standard-chrome-v1',
   });
 });
 
