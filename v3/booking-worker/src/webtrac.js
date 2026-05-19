@@ -436,6 +436,8 @@ async function login(page) {
     }
 
     const password = firstVisible(page, [
+      '#weblogin_password',
+      'input[name="weblogin_password"]',
       'input[name="password"]',
       'input[name="Password"]',
       'input[id*="pass" i]',
@@ -481,6 +483,8 @@ async function findUsernameForPassword(page, passwordLocator) {
   if (!await passwordLocator.count()) return page.locator('__missing_login_username__');
   const password = passwordLocator.first();
   const usernameSelectors = [
+    '#weblogin_username',
+    'input[name="weblogin_username"]',
     'input[name="username"]',
     'input[name="Username"]',
     'input[name="user"]',

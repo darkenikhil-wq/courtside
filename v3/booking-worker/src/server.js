@@ -24,6 +24,7 @@ app.get('/health', (req, res) => {
     browserProfile: 'browser-like-v1',
     browserRuntime: config.browserRuntimeLabel,
     browserConnectMode: config.browserConnectMode,
+    workerBuild: 'webtrac-login-targeting-v2',
   });
 });
 
