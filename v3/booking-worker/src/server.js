@@ -289,7 +289,7 @@ async function persistReserveJob(job) {
   try {
     await fs.mkdir(RESERVE_JOB_STORE_DIR, { recursive: true });
     const target = reserveJobPath(job.id);
-    const tmp = `${target}.${process.pid}.tmp`;
+    const tmp = `${target}.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`;
     await fs.writeFile(tmp, JSON.stringify(job), 'utf8');
     await fs.rename(tmp, target);
   } catch (e) {
