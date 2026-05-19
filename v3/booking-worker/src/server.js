@@ -1,5 +1,7 @@
 import express from 'express';
 import crypto from 'node:crypto';
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import { config, assertRuntimeConfig } from './config.js';
 import { validateBookingRequest } from './validation.js';
 import { finalizeWebtracCheckout, inspectCheckoutFlow, reserveWithWebtrac } from './webtrac.js';
@@ -7,6 +9,7 @@ import { finalizeWebtracCheckout, inspectCheckoutFlow, reserveWithWebtrac } from
 const app = express();
 const reserveJobs = new Map();
 const RESERVE_JOB_TTL_MS = 30 * 60 * 1000;
+const RESERVE_JOB_STORE_DIR = path.join(config.artifactDir, 'reserve-jobs');
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
@@ -24,7 +27,7 @@ app.get('/health', (req, res) => {
     browserProfile: 'browser-like-v1',
     browserRuntime: config.browserRuntimeLabel,
     browserConnectMode: config.browserConnectMode,
-    workerBuild: 'webtrac-login-targeting-v2',
+    workerBuild: 'durable-reserve-jobs-v1',
   });
 });
 
@@ -108,7 +111,7 @@ app.post('/reserve/start', async (req, res) => {
   }
 });
 
-app.get('/reserve/status/:jobId', (req, res) => {
+app.get('/reserve/status/:jobId', async (req, res) => {
   if (!isAuthorized(req)) {
     return res.status(401).json({
       status: 'rejected',
@@ -117,7 +120,7 @@ app.get('/reserve/status/:jobId', (req, res) => {
     });
   }
 
-  const job = reserveJobs.get(req.params.jobId);
+  const job = reserveJobs.get(req.params.jobId) || await readReserveJob(req.params.jobId);
   if (!job) {
     return res.status(404).json({
       status: 'not_found',
@@ -239,11 +242,13 @@ function enqueueReserveJob(payload) {
     statusCode: 202,
   };
   reserveJobs.set(job.id, job);
+  persistReserveJob(job);
 
   setTimeout(async () => {
     job.status = 'running';
     job.startedAt = new Date().toISOString();
     job.updatedAt = job.startedAt;
+    await persistReserveJob(job);
     try {
       const result = await reserveWithWebtrac(payload);
       job.status = 'succeeded';
@@ -267,10 +272,43 @@ function enqueueReserveJob(payload) {
     } finally {
       job.finishedAt = new Date().toISOString();
       job.updatedAt = job.finishedAt;
+      await persistReserveJob(job);
     }
   }, 0);
 
   return job;
+}
+
+async function persistReserveJob(job) {
+  try {
+    await fs.mkdir(RESERVE_JOB_STORE_DIR, { recursive: true });
+    const target = reserveJobPath(job.id);
+    const tmp = `${target}.${process.pid}.tmp`;
+    await fs.writeFile(tmp, JSON.stringify(job), 'utf8');
+    await fs.rename(tmp, target);
+  } catch (e) {
+    console.warn('[reserve:job:persist_failed]', { id: job.id, message: e.message || String(e) });
+  }
+}
+
+async function readReserveJob(id) {
+  if (!/^[a-f0-9-]{20,}$/i.test(id || '')) return null;
+  try {
+    const text = await fs.readFile(reserveJobPath(id), 'utf8');
+    const job = JSON.parse(text);
+    const created = Date.parse(job.createdAt || '');
+    if (Number.isFinite(created) && created < Date.now() - RESERVE_JOB_TTL_MS) {
+      await fs.rm(reserveJobPath(id), { force: true });
+      return null;
+    }
+    return job;
+  } catch {
+    return null;
+  }
+}
+
+function reserveJobPath(id) {
+  return path.join(RESERVE_JOB_STORE_DIR, `${id}.json`);
 }
 
 function cleanupReserveJobs() {
@@ -278,6 +316,26 @@ function cleanupReserveJobs() {
   for (const [id, job] of reserveJobs) {
     const created = Date.parse(job.createdAt || '');
     if (Number.isFinite(created) && created < cutoff) reserveJobs.delete(id);
+  }
+  cleanupReserveJobFiles(cutoff);
+}
+
+async function cleanupReserveJobFiles(cutoff) {
+  try {
+    const entries = await fs.readdir(RESERVE_JOB_STORE_DIR, { withFileTypes: true });
+    await Promise.all(entries
+      .filter((entry) => entry.isFile() && entry.name.endsWith('.json'))
+      .map(async (entry) => {
+        const target = path.join(RESERVE_JOB_STORE_DIR, entry.name);
+        try {
+          const stat = await fs.stat(target);
+          if (stat.mtimeMs < cutoff) await fs.rm(target, { force: true });
+        } catch {
+          // Best-effort cleanup only.
+        }
+      }));
+  } catch {
+    // The store is created lazily on the first reserve job.
   }
 }
 
