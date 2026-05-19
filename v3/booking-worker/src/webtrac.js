@@ -117,6 +117,9 @@ export async function inspectCheckoutFlow(options = {}) {
       steps.push(snapshot);
 
       if (snapshot.stopReason) {
+        if (snapshot.stopReason === 'payment_page') {
+          snapshot.paymentMethodProbe = await inspectPaymentMethodSelector(page);
+        }
         return {
           status: 'checkout_inspected',
           code: 'CHECKOUT_INSPECTION_STOPPED',
@@ -419,6 +422,93 @@ function checkoutStopMessage(reason) {
   if (reason === 'payment_page') return 'Checkout inspection reached the payment step and stopped before entering or submitting payment.';
   if (reason === 'final_payment_action') return 'Checkout inspection found a final payment/confirmation action and stopped before clicking it.';
   return 'Checkout inspection stopped.';
+}
+
+async function inspectPaymentMethodSelector(page) {
+  const selectors = [
+    '#webcheckout_requiredmethod_vm_1_button',
+    '[id*="requiredmethod" i]',
+    '[name*="requiredmethod" i]',
+    'button',
+    'a',
+  ];
+
+  for (const selector of selectors) {
+    const locators = await page.locator(selector).filter({ visible: true }).all().catch(() => []);
+    for (const locator of locators) {
+      const label = await controlLabel(locator);
+      if (!/select\s+a\s+payment\s+method|payment\s+method/i.test(label)) continue;
+      if (/submit|make\s+payment|process\s+payment|complete|purchase/i.test(label)) continue;
+
+      await locator.click().catch(() => {});
+      await page.waitForLoadState('domcontentloaded', { timeout: 8000 }).catch(() => {});
+      await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {});
+      await page.waitForTimeout(500);
+
+      return {
+        clicked: true,
+        selector,
+        label: label.replace(/\s+/g, ' ').trim(),
+        url: page.url(),
+        options: await visiblePaymentMethodOptions(page),
+      };
+    }
+  }
+
+  return {
+    clicked: false,
+    reason: 'payment_method_selector_not_found',
+    options: await visiblePaymentMethodOptions(page),
+  };
+}
+
+async function visiblePaymentMethodOptions(page) {
+  return page.evaluate(() => {
+    function visible(el) {
+      const style = window.getComputedStyle(el);
+      const rect = el.getBoundingClientRect();
+      return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0;
+    }
+
+    function labelFor(el) {
+      const id = el.getAttribute('id');
+      return [
+        el.innerText,
+        el.textContent,
+        el.value,
+        el.getAttribute('aria-label'),
+        el.getAttribute('title'),
+        el.getAttribute('name'),
+        id ? document.querySelector(`label[for="${CSS.escape(id)}"]`)?.textContent : '',
+        el.closest('label, li, tr, .dropdown-menu, .ui-menu-item, .form-group')?.textContent,
+      ].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+    }
+
+    const optionElements = [
+      ...Array.from(document.querySelectorAll('select option')).filter((el) => !el.disabled),
+      ...Array.from(document.querySelectorAll('input[type="radio"], input[type="checkbox"], button, a, [role="option"], [role="menuitem"], li')),
+    ];
+
+    const seen = new Set();
+    return optionElements
+      .filter(visible)
+      .map((el) => ({
+        tag: el.tagName.toLowerCase(),
+        type: el.getAttribute('type') || '',
+        id: el.getAttribute('id') || '',
+        name: el.getAttribute('name') || '',
+        value: String(el.value || '').slice(0, 80),
+        label: labelFor(el).slice(0, 220),
+      }))
+      .filter((item) => /payment|credit|card|visa|mastercard|amex|american express|discover|e-?check|bank|account|new|saved|cash|pay later|refund|household|balance/i.test(`${item.label} ${item.name} ${item.id} ${item.value}`))
+      .filter((item) => {
+        const key = `${item.tag}|${item.type}|${item.id}|${item.name}|${item.value}|${item.label}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .slice(0, 40);
+  });
 }
 
 async function clickCheckoutInspectionNext(page) {
