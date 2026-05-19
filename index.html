@@ -466,6 +466,39 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       gap: 10px;
       margin-bottom: 10px;
     }
+    .date-chip-row {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 7px;
+      margin-bottom: 10px;
+    }
+    .date-chip {
+      min-height: 48px;
+      padding: 8px 6px;
+      background: var(--card);
+      border: 1.5px solid var(--line);
+      border-radius: 8px;
+      color: var(--muted);
+      font-family: inherit;
+      font-weight: 650;
+      font-size: 12px;
+      line-height: 1.15;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s, background 0.15s;
+    }
+    .date-chip:hover { border-color: rgba(var(--accent-rgb), 0.30); }
+    .date-chip.active {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: rgba(var(--accent-rgb), 0.06);
+    }
+    .date-chip span {
+      display: block;
+      margin-top: 3px;
+      color: var(--ink);
+      font-size: 13px;
+      font-weight: 700;
+    }
     .when-input {
       width: 100%;
       padding: 12px 14px;
@@ -1151,6 +1184,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     @media (max-width: 480px) {
       .card { padding: 36px 24px 28px; border-radius: 24px; }
       h1 { font-size: 32px; }
+      .date-chip-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .result-card { grid-template-columns: 1fr; align-items: stretch; }
       .result-status { width: max-content; min-width: 0; }
       .results-toolbar { grid-template-columns: 1fr; }
@@ -1567,6 +1601,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const day = String(d.getDate()).padStart(2, '0');
       return `${y}-${m}-${day}`;
     }
+    function parseISODate(iso) {
+      const [y, mo, d] = iso.split('-').map(Number);
+      return new Date(y, mo - 1, d);
+    }
     function dateFromISOAndTime(iso, hhmm) {
       const [y, mo, d] = iso.split('-').map(Number);
       const [h, m] = hhmm.split(':').map(Number);
@@ -1590,6 +1628,41 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const d = new Date();
       d.setDate(d.getDate() + BOOKING_MAX_DAYS_AHEAD);
       return formatLocalDate(d);
+    }
+    function weekDateOptions() {
+      const first = parseISODate(defaultBookingDateISO());
+      const max = parseISODate(maxBookingDateISO());
+      const labels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      const out = [];
+      for (let i = 0; i < 7; i += 1) {
+        const d = new Date(first);
+        d.setDate(first.getDate() + i);
+        if (d > max) break;
+        const iso = formatLocalDate(d);
+        out.push({
+          iso,
+          day: i === 0 ? 'Tomorrow' : labels[d.getDay()],
+          date: `${d.getMonth() + 1}/${d.getDate()}`,
+        });
+      }
+      return out;
+    }
+    function dateChipsHtml() {
+      return `
+        <div class="date-chip-row" aria-label="Quick dates">
+          ${weekDateOptions().map(item => `
+            <button type="button" class="date-chip${item.iso === bookingPrefs.date ? ' active' : ''}" data-date="${item.iso}" aria-pressed="${item.iso === bookingPrefs.date}">
+              ${item.day}<span>${item.date}</span>
+            </button>
+          `).join('')}
+        </div>`;
+    }
+    function syncDateChips() {
+      card.querySelectorAll('.date-chip').forEach(btn => {
+        const active = btn.dataset.date === bookingPrefs.date;
+        btn.classList.toggle('active', active);
+        btn.setAttribute('aria-pressed', String(active));
+      });
     }
     // WebTrac/Arlington operating window: bookings 8am–9pm only.
     // Latest valid start time depends on duration: a 60-min booking can start
@@ -1652,6 +1725,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         return `${h12}:${String(mn).padStart(2, '0')} ${ampm}`;
       };
       return `${fmt(startMins)} – ${fmt(endMins)}`;
+    }
+    function formatBookingWindow() {
+      if (!bookingPrefs.date) return formatBookingRange();
+      const d = parseISODate(bookingPrefs.date);
+      const day = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()];
+      return `${day} ${d.getMonth() + 1}/${d.getDate()} · ${formatBookingRange()}`;
     }
     function initBookingPrefsIfNeeded() {
       if (!bookingPrefs.date) bookingPrefs.date = defaultBookingDateISO();
@@ -1772,8 +1851,15 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       } catch (e) {
         clearTimeout(timer);
         console.warn('[availability] failed:', e && e.message || e, e);
+        let message = e && e.message;
+        try {
+          if (e && e.body) {
+            const parsed = JSON.parse(e.body);
+            message = parsed.error || parsed.message || message;
+          }
+        } catch (parseErr) {}
         // Surface the error so refreshAvailability can show a specific message.
-        return { __error: true, status: e && e.status, message: e && e.message };
+        return { __error: true, status: e && e.status, message };
       }
     }
 
@@ -1801,10 +1887,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     function availabilitySummaryForSelectedRange(availability, court) {
       if (availability && availability.__error) {
+        const configError = /SCRAPER_API_KEY|env var|not configured/i.test(availability.message || '');
         return {
           tone: 'warn',
-          label: 'Check manually',
-          detail: `Live availability did not load for ${formatBookingRange()}.`,
+          label: configError ? 'Setup needed' : 'Check manually',
+          detail: configError
+            ? 'Live availability is not configured on this deployment.'
+            : `Live availability did not load for ${formatBookingWindow()}.`,
           rankBucket: 2,
           openCount: 0,
           totalCount: 0,
@@ -1824,7 +1913,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           return {
             tone: 'open',
             label: `${openUnits.length}/${normalized.courts.length} open`,
-            detail: `${unitNames}${more} at ${formatBookingRange()}`,
+            detail: `${unitNames}${more} at ${formatBookingWindow()}`,
             rankBucket: 0,
             openCount: openUnits.length,
             totalCount: normalized.courts.length,
@@ -1834,7 +1923,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         return {
           tone: 'full',
           label: 'Full',
-          detail: `No courts open at ${formatBookingRange()}`,
+          detail: `No courts open at ${formatBookingWindow()}`,
           rankBucket: 3,
           openCount: 0,
           totalCount: normalized.courts.length,
@@ -1848,8 +1937,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           tone: open ? 'open' : 'full',
           label: open ? 'Open' : 'Full',
           detail: open
-            ? `Available at ${formatBookingRange()}`
-            : `Unavailable at ${formatBookingRange()}`,
+            ? `Available at ${formatBookingWindow()}`
+            : `Unavailable at ${formatBookingWindow()}`,
           rankBucket: open ? 0 : 3,
           openCount: open ? 1 : 0,
           totalCount: 1,
@@ -1860,7 +1949,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       return {
         tone: 'warn',
         label: 'Manual check',
-        detail: `No detailed availability came back for ${formatBookingRange()}.`,
+        detail: `No detailed availability came back for ${formatBookingWindow()}.`,
         rankBucket: 2,
         openCount: 0,
         totalCount: 0,
@@ -2238,7 +2327,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           court?.name,
           courtUnit?.displayLabel || courtUnit?.label,
           bookingPrefs.date,
-          formatBookingRange(),
+          formatBookingWindow(),
         ].filter(Boolean).join(' · ');
 
         const backdrop = document.createElement('div');
@@ -2719,10 +2808,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }
     }
 
-    const backLinkHtml = `<button class="back-link" id="backLink">← Sports</button>`;
-    function wireBackLink() {
+    function backLinkHtml(label = '← Sports') {
+      return `<button class="back-link" id="backLink">${label}</button>`;
+    }
+    function wireBackLink(onBack = renderSportPicker) {
       const el = document.getElementById('backLink');
-      if (el) el.addEventListener('click', () => renderSportPicker());
+      if (el) el.addEventListener('click', onBack);
     }
 
     function timePickerHtml() {
@@ -2742,11 +2833,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
               `).join('')}
             </select>
           </div>
+          ${dateChipsHtml()}
           <div class="duration-toggle" role="radiogroup" aria-label="Duration">
             <button type="button" class="seg${bookingPrefs.duration === 60 ? ' active' : ''}" data-duration="60" role="radio" aria-checked="${bookingPrefs.duration === 60}">60 min</button>
             <button type="button" class="seg${bookingPrefs.duration === 90 ? ' active' : ''}" data-duration="90" role="radio" aria-checked="${bookingPrefs.duration === 90}">90 min</button>
           </div>
-          <div class="booking-range" id="bookingRange">${formatBookingRange()}</div>
+          <div class="booking-range" id="bookingRange">${formatBookingWindow()}</div>
         </div>`;
     }
 
@@ -2755,7 +2847,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const timeEl = document.getElementById('prefTime');
       const rangeEl = document.getElementById('bookingRange');
       const updateRange = () => {
-        if (rangeEl) rangeEl.textContent = formatBookingRange();
+        if (rangeEl) rangeEl.textContent = formatBookingWindow();
         if (onChange) onChange();
       };
       const rebuildTimeDropdown = () => {
@@ -2783,7 +2875,16 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (dateEl) dateEl.addEventListener('change', () => {
         if (!dateEl.value) return;
         bookingPrefs.date = dateEl.value;
+        syncDateChips();
         rebuildTimeDropdown();
+      });
+      card.querySelectorAll('.date-chip').forEach(btn => {
+        btn.addEventListener('click', () => {
+          bookingPrefs.date = btn.dataset.date;
+          if (dateEl) dateEl.value = bookingPrefs.date;
+          syncDateChips();
+          rebuildTimeDropdown();
+        });
       });
       if (timeEl) timeEl.addEventListener('change', () => {
         if (!timeEl.value) return;
@@ -2805,7 +2906,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     function renderTimeFirstSearch(errMsg) {
       card.innerHTML = `
-        ${backLinkHtml}
+        ${backLinkHtml()}
         ${sportIconSvg(selectedSport, false)}
         <h1>When do you<br><em>want to play?</em></h1>
         <p class="perm-body">
@@ -2862,7 +2963,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     function renderPermissionPrompt() {
       card.innerHTML = `
-        ${backLinkHtml}
+        ${backLinkHtml()}
         <div class="pin-circle">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                stroke-linecap="round" stroke-linejoin="round">
@@ -2894,13 +2995,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       card.innerHTML = `
         ${sportIconSvg(selectedSport, true)}
         <h1>Checking<br><em>availability</em></h1>
-        <p class="status" id="status">Finding courts near you for ${formatBookingRange()}…</p>
+        <p class="status" id="status">Finding courts near you for ${formatBookingWindow()}…</p>
       `;
     }
 
     function renderDeniedHelp() {
       card.innerHTML = `
-        ${backLinkHtml}
+        ${backLinkHtml()}
         <div class="pin-circle">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                stroke-linecap="round" stroke-linejoin="round">
@@ -2961,7 +3062,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             const dist = formatDist(court.dist);
             renderCourtSearchResults(
               userLoc,
-              `You do not appear to be right at a court. The nearest match is ${court.name} (${dist}), so here are available options for ${formatBookingRange()}.`
+              `You do not appear to be right at a court. The nearest match is ${court.name} (${dist}), so here are available options for ${formatBookingWindow()}.`
             );
           }
         },
@@ -3043,11 +3144,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
               `).join('')}
             </select>
           </div>
+          ${dateChipsHtml()}
           <div class="duration-toggle" role="radiogroup" aria-label="Duration">
             <button type="button" class="seg${bookingPrefs.duration === 60 ? ' active' : ''}" data-duration="60" role="radio" aria-checked="${bookingPrefs.duration === 60}">60 min</button>
             <button type="button" class="seg${bookingPrefs.duration === 90 ? ' active' : ''}" data-duration="90" role="radio" aria-checked="${bookingPrefs.duration === 90}">90 min</button>
           </div>
-          <div class="booking-range" id="bookingRange">${formatBookingRange()}</div>
+          <div class="booking-range" id="bookingRange">${formatBookingWindow()}</div>
           <div class="court-unit-picker" id="courtUnitPicker" hidden>
             <p class="when-label">Court</p>
             <div class="court-unit-grid" id="courtUnitGrid"></div>
@@ -3080,8 +3182,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         <button class="back-link" id="bookAnotherBtn" style="position: static; margin: 6px auto 0;">↻ Book another</button>
       `;
 
+      const detailBackLabel = court ? '← Courts' : '← Sports';
       card.innerHTML = `
-        ${backLinkHtml}
+        ${backLinkHtml(detailBackLabel)}
         ${header}
         <div class="cta-list">${items}</div>
         ${footer}
@@ -3102,7 +3205,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         const reserveBtn = document.getElementById('reserveBtn');
 
         const updateRangeLabel = () => {
-          if (rangeEl) rangeEl.textContent = formatBookingRange();
+          if (rangeEl) rangeEl.textContent = formatBookingWindow();
         };
         const resetReserveFeedback = () => {
           if (reserveStatusEl) reserveStatusEl.hidden = true;
@@ -3156,10 +3259,21 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if (dateEl) dateEl.addEventListener('change', () => {
           if (dateEl.value) {
             bookingPrefs.date = dateEl.value;
+            syncDateChips();
             rebuildTimeDropdown();
             updateRangeLabel();
             resetReserveFeedback();
           }
+        });
+        card.querySelectorAll('.date-chip').forEach(btn => {
+          btn.addEventListener('click', () => {
+            bookingPrefs.date = btn.dataset.date;
+            if (dateEl) dateEl.value = bookingPrefs.date;
+            syncDateChips();
+            rebuildTimeDropdown();
+            updateRangeLabel();
+            resetReserveFeedback();
+          });
         });
         if (timeEl) timeEl.addEventListener('change', () => {
           if (timeEl.value) {
@@ -3251,7 +3365,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         });
       }
 
-      wireBackLink();
+      wireBackLink(court ? () => renderFallback(null, userLoc) : renderSportPicker);
     }
 
     const CONTACT_EMAIL = 'support@courtsidereservations.com';
@@ -3330,7 +3444,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         ? 'Tell us your preferred lesson days, player age/level, and what you want to work on.'
         : "What's on your mind?";
       card.innerHTML = `
-        ${backLinkHtml}
+        ${backLinkHtml()}
         <div class="pin-circle">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <path d="M4 6h16v12H4z"/>
@@ -3425,7 +3539,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     function renderWorkWithUs() {
       card.innerHTML = `
-        ${backLinkHtml}
+        ${backLinkHtml()}
         <div class="pin-circle">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <rect x="2.5" y="7.5" width="19" height="13" rx="2"/>
@@ -3507,7 +3621,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     function renderCoaches() {
       card.innerHTML = `
-        ${backLinkHtml}
+        ${backLinkHtml()}
         <div class="pin-circle">
           ${ICONS.coach}
         </div>
@@ -3528,7 +3642,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const waitlistKey = params.get('cat') || 'general';
       const purpose = `We'll only use your email to tell you when this is ready — never anything else, never shared.`;
       card.innerHTML = `
-        ${backLinkHtml}
+        ${backLinkHtml()}
         <div class="pin-circle" style="background: rgba(var(--accent-rgb), 0.10);">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="9"/>
@@ -3624,7 +3738,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       return {
         tone: 'checking',
         label: 'Checking',
-        detail: `Checking ${formatBookingRange()}`,
+        detail: `Checking ${formatBookingWindow()}`,
         rankBucket: 1,
         openCount: 0,
         totalCount: court.numCourts || 0,
@@ -3747,12 +3861,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         ? `${sport.label} near you`
         : `${sport.label} courts`;
       const summary = nearby
-        ? `Ranking available courts first, then nearest options for ${formatBookingRange()}.`
-        : `Ranking available ${sport.label.toLowerCase()} courts first for ${formatBookingRange()}.`;
+        ? `Ranking available courts first, then nearest options for ${formatBookingWindow()}.`
+        : `Ranking available ${sport.label.toLowerCase()} courts first for ${formatBookingWindow()}.`;
 
       const runId = ++courtSearchRunId;
       card.innerHTML = `
-        ${backLinkHtml}
+        ${backLinkHtml()}
         ${sportIconSvg(selectedSport, false)}
         <h1>${title}</h1>
         <div class="search-summary">${summary}</div>
