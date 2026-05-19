@@ -51,6 +51,7 @@ console.log('');
 console.log(`DRY_RUN=${config.dryRun}`);
 console.log(`HEADLESS=${config.headless}`);
 console.log(`PORT=${config.port}`);
+console.log(`WEBTRAC_CLEAR_CART_BEFORE_RESERVE=${config.clearCartBeforeReserve}`);
 console.log(`ALLOW_WEBTRAC_FINAL_PAYMENT=${config.allowWebtracFinalPayment}`);
 
 if (paymentMissing.length) {

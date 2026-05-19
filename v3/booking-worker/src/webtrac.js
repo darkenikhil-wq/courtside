@@ -26,6 +26,19 @@ export async function reserveWithWebtrac(payload) {
 
   try {
     await login(page);
+    const cartReset = !config.dryRun && config.clearCartBeforeReserve
+      ? await clearWebtracCart(page)
+      : { skipped: true, reason: config.dryRun ? 'dry_run' : 'disabled' };
+    if (cartReset.blocked) {
+      return {
+        status: 'cart_reset_failed',
+        code: 'WEBTRAC_STALE_CART_NOT_CLEARED',
+        message: 'WebTrac already had a cart item and the worker could not clear it. Empty the WebTrac cart before trying this court again.',
+        dryRun: false,
+        cartReset,
+      };
+    }
+
     const searchUrl = normalizeSearchUrl(payload.webtracSearchUrl, payload);
     await page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: 45000 });
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
@@ -67,16 +80,24 @@ export async function reserveWithWebtrac(payload) {
     const addToCartResult = await addSelectedItemsToCart(page, searchUrl);
     const promptResults = await completeCartPrompts(page, payload);
 
-    const cartState = await confirmCartState(page, searchUrl);
-    const cartReady = addResults.every(r => r.ok) && cartState.confirmed;
+    const cartState = await confirmCartState(page, searchUrl, payload);
+    const cartMatchesRequest = cartState.expectedMatch ? cartState.expectedMatch.ok : true;
+    const cartReady = addResults.every(r => r.ok) && cartState.confirmed && cartMatchesRequest;
 
     return {
       status: cartReady ? 'cart_updated' : 'cart_update_uncertain',
-      code: cartReady ? 'WEBTRAC_CART_READY' : 'WEBTRAC_CART_UPDATE_UNCERTAIN',
+      code: cartReady
+        ? 'WEBTRAC_CART_READY'
+        : cartState.confirmed && !cartMatchesRequest
+          ? 'WEBTRAC_CART_MISMATCH'
+          : 'WEBTRAC_CART_UPDATE_UNCERTAIN',
       message: cartReady
         ? 'Added to the WebTrac cart. Confirm payment in Courtside to complete Arlington/WebTrac checkout.'
+        : cartState.confirmed && !cartMatchesRequest
+          ? 'WebTrac cart does not match the requested court/time, so Courtside stopped before payment.'
         : 'WebTrac accepted the selection request, but the worker could not confirm the item in the cart after retries.',
       dryRun: false,
+      cartReset,
       addResults,
       addToCartResult,
       promptResults,
@@ -176,12 +197,21 @@ export async function finalizeWebtracCheckout(options = {}) {
     await page.goto(WEBTRAC_ORIGIN + '/webtrac/web/cart.html', { waitUntil: 'domcontentloaded', timeout: 45000 });
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
-    const cart = await inspectCartPage(page);
+    const expectedBooking = options.booking && typeof options.booking === 'object' ? options.booking : null;
+    const cart = await inspectCartPage(page, expectedBooking);
     if (!cart.confirmed) {
       return {
         status: 'webtrac_finalize_failed',
         code: 'WEBTRAC_CART_EMPTY',
         message: 'WebTrac cart is empty, so final checkout cannot continue.',
+        cart,
+      };
+    }
+    if (expectedBooking && !cart.expectedMatch?.ok) {
+      return {
+        status: 'webtrac_finalize_failed',
+        code: 'WEBTRAC_CART_MISMATCH',
+        message: 'WebTrac cart does not match the requested court/time, so final checkout was stopped before payment.',
         cart,
       };
     }
@@ -423,7 +453,7 @@ async function inspectSearchPage(page, payload) {
   };
 }
 
-async function inspectCartPage(page) {
+async function inspectCartPage(page, expectedBooking = null) {
   const bodyText = await page.locator('body').innerText({ timeout: 10000 }).catch(() => '');
   const compact = bodyText.replace(/\s+/g, ' ').trim();
   const cartCount = compact.match(/CART \((\d+) ITEMS?\)/i);
@@ -442,11 +472,201 @@ async function inspectCartPage(page) {
     amountToday: amountToday ? `$${amountToday[1]}` : null,
     hasProceedToCheckout: /Proceed To Checkout/i.test(compact),
     hasPaymentPrompt: /Select A Payment Method|Payment Method|Amount To Be Paid Today/i.test(compact),
+    expectedMatch: expectedBooking ? expectedCartMatch(compact, expectedBooking) : null,
     bodySnippet: compact.slice(0, 900),
   };
 }
 
-async function confirmCartState(page, searchUrl) {
+async function clearWebtracCart(page) {
+  const attempts = [];
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    await page.goto(WEBTRAC_ORIGIN + '/webtrac/web/cart.html', { waitUntil: 'domcontentloaded', timeout: 45000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+    const before = await inspectCartPage(page);
+    if (!before.confirmed) {
+      return {
+        attempted: attempts.length > 0,
+        cleared: true,
+        before: summarizeCartForOutput(before),
+        attempts,
+      };
+    }
+
+    const clickResult = await clickEmptyCartControl(page);
+    attempts.push({
+      attempt,
+      before: summarizeCartForOutput(before),
+      clickResult,
+    });
+    if (!clickResult.clicked) {
+      return {
+        attempted: true,
+        cleared: false,
+        blocked: true,
+        reason: 'empty_cart_control_not_found',
+        before: summarizeCartForOutput(before),
+        attempts,
+      };
+    }
+  }
+
+  await page.goto(WEBTRAC_ORIGIN + '/webtrac/web/cart.html', { waitUntil: 'domcontentloaded', timeout: 45000 }).catch(() => {});
+  await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+  const after = await inspectCartPage(page);
+  return {
+    attempted: true,
+    cleared: !after.confirmed,
+    blocked: after.confirmed,
+    reason: after.confirmed ? 'cart_still_has_items' : null,
+    after: summarizeCartForOutput(after),
+    attempts,
+  };
+}
+
+async function clickEmptyCartControl(page) {
+  const selectors = [
+    '#webcart_buttonemptycart',
+    '[id*="emptycart" i]',
+    '[name*="emptycart" i]',
+    'button',
+    'a',
+    'input[type="submit"]',
+    'input[type="button"]',
+  ];
+
+  for (const selector of selectors) {
+    const locators = await page.locator(selector).filter({ visible: true }).all().catch(() => []);
+    for (const locator of locators) {
+      const label = await controlLabel(locator);
+      if (!/empty\s+cart|clear\s+cart|remove\s+all/i.test(label)) continue;
+
+      const dialogPromise = page.waitForEvent('dialog', { timeout: 1000 })
+        .then(async (dialog) => {
+          await dialog.accept();
+          return true;
+        })
+        .catch(() => false);
+      await Promise.all([
+        page.waitForLoadState('domcontentloaded', { timeout: 15000 }).catch(() => {}),
+        locator.click(),
+      ]);
+      const dialogAccepted = await dialogPromise;
+      await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+      await page.waitForTimeout(500);
+      return {
+        clicked: true,
+        selector,
+        label: label.replace(/\s+/g, ' ').trim(),
+        dialogAccepted,
+        url: page.url(),
+      };
+    }
+  }
+
+  return { clicked: false, reason: 'empty_cart_control_not_found', url: page.url() };
+}
+
+function summarizeCartForOutput(cart) {
+  if (!cart) return null;
+  return {
+    url: cart.url,
+    title: cart.title,
+    itemCount: cart.itemCount,
+    confirmed: cart.confirmed,
+    grandTotal: cart.grandTotal,
+    amountToday: cart.amountToday,
+    hasProceedToCheckout: cart.hasProceedToCheckout,
+    hasPaymentPrompt: cart.hasPaymentPrompt,
+    expectedMatch: cart.expectedMatch || null,
+  };
+}
+
+function expectedCartMatch(cartText, booking) {
+  const text = normalizeMatchText(cartText);
+  const expected = expectedCartTerms(booking);
+  const court = expected.courts.some((value) => text.includes(normalizeMatchText(value)));
+  const date = expected.dates.some((value) => text.includes(normalizeMatchText(value)));
+  const start = expected.starts.some((value) => text.includes(normalizeMatchText(value)));
+  const end = expected.ends.some((value) => text.includes(normalizeMatchText(value)));
+  return {
+    ok: court && date && start && end,
+    court,
+    date,
+    start,
+    end,
+    expected: {
+      courtName: booking.courtName || null,
+      courtCode: booking.courtCode || null,
+      date: booking.date || null,
+      start: booking.start || null,
+      end: booking.end || null,
+    },
+  };
+}
+
+function expectedCartTerms(booking) {
+  return {
+    courts: uniqueTerms([
+      booking.courtName,
+      booking.courtCode,
+      booking.courtId,
+      String(booking.courtName || '').replace(/\s+(park|center|ms)$/i, ''),
+    ]),
+    dates: dateTerms(booking.date, booking.dateWebtrac),
+    starts: timeTerms(booking.start),
+    ends: timeTerms(booking.end),
+  };
+}
+
+function dateTerms(isoDate, webtracDate) {
+  const terms = [];
+  if (webtracDate) terms.push(webtracDate);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(String(isoDate || ''))) {
+    const [year, month, day] = String(isoDate).split('-').map(Number);
+    const date = new Date(Date.UTC(year, month - 1, day, 12));
+    terms.push(`${String(month).padStart(2, '0')}/${String(day).padStart(2, '0')}/${year}`);
+    terms.push(`${month}/${day}/${year}`);
+    terms.push(date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' }));
+    terms.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }));
+    terms.push(date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', timeZone: 'UTC' }));
+    terms.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }));
+  }
+  return uniqueTerms(terms);
+}
+
+function timeTerms(hhmm) {
+  const match = String(hhmm || '').match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return [];
+  const hour = Number(match[1]);
+  const minute = match[2];
+  const ampm = hour >= 12 ? 'PM' : 'AM';
+  const hour12 = hour % 12 === 0 ? 12 : hour % 12;
+  const paddedHour12 = String(hour12).padStart(2, '0');
+  return uniqueTerms([
+    `${hour12}:${minute} ${ampm}`,
+    `${paddedHour12}:${minute} ${ampm}`,
+    `${hour12}:${minute}${ampm.toLowerCase()}`,
+    `${paddedHour12}:${minute}${ampm.toLowerCase()}`,
+    `${hour12}:${minute} ${ampm.toLowerCase()}`,
+    `${paddedHour12}:${minute} ${ampm.toLowerCase()}`,
+    `${hour12}:${minute} ${ampm[0]}.M.`,
+    `${paddedHour12}:${minute} ${ampm[0]}.M.`,
+  ]);
+}
+
+function uniqueTerms(values) {
+  return Array.from(new Set(values.map((value) => String(value || '').trim()).filter(Boolean)));
+}
+
+function normalizeMatchText(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[–—]/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+async function confirmCartState(page, searchUrl, expectedBooking = null) {
   const attempts = [];
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     if (attempt > 1) {
@@ -457,7 +677,7 @@ async function confirmCartState(page, searchUrl) {
 
     await page.goto(WEBTRAC_ORIGIN + '/webtrac/web/cart.html', { waitUntil: 'domcontentloaded', timeout: 45000 }).catch(() => {});
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-    const cartState = await inspectCartPage(page);
+    const cartState = await inspectCartPage(page, expectedBooking);
     attempts.push({
       attempt,
       url: cartState.url,
@@ -466,6 +686,7 @@ async function confirmCartState(page, searchUrl) {
       confirmed: cartState.confirmed,
       grandTotal: cartState.grandTotal,
       amountToday: cartState.amountToday,
+      expectedMatch: cartState.expectedMatch,
       snippet: cartState.bodySnippet,
     });
     if (cartState.confirmed) return { ...cartState, attempts };

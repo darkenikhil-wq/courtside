@@ -103,8 +103,15 @@ the guard is still off, the Stripe authorization is released.
   authenticated WebTrac origin and then reloads the search page. This may add
   slots to the WebTrac cart, but final checkout still requires the separate
   `ALLOW_WEBTRAC_FINAL_PAYMENT=true` guard.
+- `WEBTRAC_CLEAR_CART_BEFORE_RESERVE=true`: clears stale WebTrac cart items
+  before adding the newly requested court. Keep this on while one Courtside
+  request maps to one WebTrac reservation.
 - Keep `HEADLESS=false` for local QA. WebTrac may show bot verification to
   headless browser sessions.
+
+The worker also checks the WebTrac cart against the requested court, date, start,
+and end time before showing payment or finalizing checkout. If the cart looks
+like an earlier test, it stops before payment with `WEBTRAC_CART_MISMATCH`.
 
 ## Connecting v3
 

@@ -10,6 +10,7 @@ export const config = {
   slowMo: Number(process.env.SLOW_MO_MS || 0),
   chromeExecutablePath: process.env.CHROME_EXECUTABLE_PATH || '',
   artifactDir: process.env.PLAYWRIGHT_ARTIFACT_DIR || new URL('../.playwright-artifacts', import.meta.url).pathname,
+  clearCartBeforeReserve: process.env.WEBTRAC_CLEAR_CART_BEFORE_RESERVE !== 'false',
   allowWebtracFinalPayment: process.env.ALLOW_WEBTRAC_FINAL_PAYMENT === 'true',
   recaptchaWaitMs: Number(process.env.WEBTRAC_RECAPTCHA_WAIT_MS || 120000),
   payment: {
