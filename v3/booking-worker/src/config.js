@@ -27,6 +27,7 @@ export const config = {
   browserWsEndpoint: explicitBrowserEndpoint || browserlessEndpoint(),
   browserConnectMode: (process.env.PLAYWRIGHT_CONNECT_MODE || 'cdp').toLowerCase(),
   browserConnectTimeoutMs: Number(process.env.PLAYWRIGHT_CONNECT_TIMEOUT_MS || 60000),
+  browserConnectAttempts: Number(process.env.PLAYWRIGHT_CONNECT_ATTEMPTS || 3),
   browserRuntimeLabel: explicitBrowserEndpoint
     ? 'remote:custom'
     : browserlessToken

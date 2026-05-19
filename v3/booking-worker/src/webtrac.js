@@ -347,10 +347,30 @@ async function createBrowser() {
       slowMo: config.slowMo,
       timeout: config.browserConnectTimeoutMs,
     };
-    if (config.browserConnectMode === 'playwright') {
-      return chromium.connect(config.browserWsEndpoint, connectOptions);
+    const attempts = Math.max(1, Math.min(Number(config.browserConnectAttempts) || 1, 5));
+    let lastError = null;
+
+    for (let attempt = 1; attempt <= attempts; attempt += 1) {
+      try {
+        if (config.browserConnectMode === 'playwright') {
+          return await chromium.connect(config.browserWsEndpoint, connectOptions);
+        }
+        return await chromium.connectOverCDP(config.browserWsEndpoint, connectOptions);
+      } catch (error) {
+        lastError = error;
+        console.warn('[browser:remote_connect_failed]', {
+          attempt,
+          attempts,
+          mode: config.browserConnectMode,
+          message: error.message || String(error),
+        });
+        if (attempt < attempts) {
+          await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
+        }
+      }
     }
-    return chromium.connectOverCDP(config.browserWsEndpoint, connectOptions);
+
+    throw lastError;
   }
 
   return chromium.launch({

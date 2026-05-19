@@ -27,9 +27,10 @@ app.get('/health', (req, res) => {
     browserProfile: 'browser-like-v1',
     browserRuntime: config.browserRuntimeLabel,
     browserConnectMode: config.browserConnectMode,
+    browserConnectAttempts: config.browserConnectAttempts,
     browserlessTimeoutSeconds: config.browserlessTimeoutSeconds,
     reserveJobStore: RESERVE_JOB_STORE_DIR,
-    workerBuild: 'browserless-timeout-agreement-v1',
+    workerBuild: 'browserless-connect-retry-v1',
   });
 });
 
