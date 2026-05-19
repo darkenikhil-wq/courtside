@@ -74,7 +74,7 @@ export async function reserveWithWebtrac(payload) {
       status: cartReady ? 'cart_updated' : 'cart_update_uncertain',
       code: cartReady ? 'WEBTRAC_CART_READY' : 'WEBTRAC_CART_UPDATE_UNCERTAIN',
       message: cartReady
-        ? 'Added to the WebTrac cart. Checkout/payment is intentionally not automated yet.'
+        ? 'Added to the WebTrac cart. Confirm payment in Courtside to complete Arlington/WebTrac checkout.'
         : 'WebTrac accepted the selection request, but the worker could not confirm the item in the cart after retries.',
       dryRun: false,
       addResults,
