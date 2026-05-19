@@ -1566,6 +1566,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     // Returns aggregate slots plus per-court-unit slots, when WebTrac exposes them.
     // Cached in-memory + sessionStorage, keyed by court|date|sport, for 60s.
     const AVAILABILITY_TTL_MS = 60 * 1000;
+    const AVAILABILITY_PARSER_VERSION = 'unit-v2';
     const availabilityMemCache = new Map();
 
     function availabilityCacheGet(key) {
@@ -1613,13 +1614,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     async function fetchAvailability(courtCode, sportType) {
       const dateMMDDYYYY = isoToWebtracDate(bookingPrefs.date);
-      const key = `${courtCode}|${dateMMDDYYYY}|${sportType}`;
+      const key = `${AVAILABILITY_PARSER_VERSION}|${courtCode}|${dateMMDDYYYY}|${sportType}`;
       const cached = availabilityCacheGet(key);
       if (cached) return cached;
       const url = '/.netlify/functions/availability'
         + `?court=${encodeURIComponent(courtCode)}`
         + `&date=${encodeURIComponent(dateMMDDYYYY)}`
-        + `&sport=${encodeURIComponent(sportType)}`;
+        + `&sport=${encodeURIComponent(sportType)}`
+        + `&parser=${encodeURIComponent(AVAILABILITY_PARSER_VERSION)}`;
       console.log('[availability] fetching', url);
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 15000);
