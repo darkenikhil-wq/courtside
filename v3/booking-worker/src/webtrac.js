@@ -1448,6 +1448,7 @@ async function completeCartPrompts(page, payload) {
 
     const bodyText = await page.locator('body').innerText({ timeout: 5000 }).catch(() => '');
     const compact = bodyText.replace(/\s+/g, ' ').trim();
+    const onAddToCartPage = /\/addtocart\.html/i.test(page.url());
     const cartState = await inspectCartPage(page).catch(() => null);
 
     if (cartState?.confirmed) {
@@ -1455,21 +1456,26 @@ async function completeCartPrompts(page, payload) {
       break;
     }
 
-    if (isCheckoutOrPaymentPage(compact)) {
+    if (!onAddToCartPage && isCheckoutOrPaymentPage(compact)) {
       results.push({ step, action: 'stopped_before_checkout', url: page.url() });
       break;
     }
 
     const looksLikeHeadcount = /facility\s*head\s*count|head\s*count|number\s+attending|participants?|attendees?/i.test(compact);
+    const looksLikeAgreement = /agree\s+to\s+the\s+above|i\s+agree|acknowledge|waiver|facility\s+rules|rental\s+policy|refund\s+policy/i.test(compact);
     const fillResult = looksLikeHeadcount ? await fillHeadcountFields(page, headcount) : { filled: 0 };
-    const clickResult = await clickSafeCartContinue(page, looksLikeHeadcount);
+    const agreementResult = looksLikeAgreement ? await checkAgreementFields(page) : { checked: 0 };
+    const clickResult = await clickSafeCartContinue(page, looksLikeHeadcount || looksLikeAgreement || onAddToCartPage);
 
     results.push({
       step,
       action: clickResult.clicked ? 'continued_prompt' : 'no_prompt_action',
       url: page.url(),
+      onAddToCartPage,
       looksLikeHeadcount,
+      looksLikeAgreement,
       fillResult,
+      agreementResult,
       clickResult,
       snippet: compact.slice(0, 500),
     });
@@ -1482,6 +1488,51 @@ async function completeCartPrompts(page, payload) {
 
 function isCheckoutOrPaymentPage(text) {
   return /proceed\s+to\s+checkout|payment\s+method|amount\s+to\s+be\s+paid\s+today|credit\s+card|checkout\/payment/i.test(text || '');
+}
+
+async function checkAgreementFields(page) {
+  return page.evaluate(() => {
+    const checkboxes = Array.from(document.querySelectorAll('input[type="checkbox"]'));
+
+    function visible(el) {
+      const style = window.getComputedStyle(el);
+      const rect = el.getBoundingClientRect();
+      return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0;
+    }
+
+    function contextText(el) {
+      const id = el.getAttribute('id');
+      return [
+        el.getAttribute('name'),
+        id,
+        el.getAttribute('aria-label'),
+        el.getAttribute('title'),
+        id ? document.querySelector(`label[for="${CSS.escape(id)}"]`)?.textContent : '',
+        el.closest('label, tr, li, .form-group, .form__row, p, div')?.textContent,
+      ].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+    }
+
+    const candidates = checkboxes.filter((el) => {
+      if (el.disabled || el.checked) return false;
+      const text = contextText(el);
+      return /agree|above|acknowledge|required|waiver|policy|rules|terms/i.test(text)
+        || (checkboxes.length === 1 && (visible(el) || /addtocart/i.test(location.href)));
+    });
+
+    const details = [];
+    for (const el of candidates) {
+      el.checked = true;
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+      details.push({
+        name: el.getAttribute('name') || '',
+        id: el.getAttribute('id') || '',
+        context: contextText(el).slice(0, 160),
+      });
+    }
+
+    return { checked: details.length, details };
+  });
 }
 
 async function fillHeadcountFields(page, headcount) {
@@ -1544,10 +1595,17 @@ async function fillHeadcountFields(page, headcount) {
 async function clickSafeCartContinue(page, isHeadcountPrompt) {
   const selectors = [
     '#frheadcount_buttoncontinue',
+    '#fraddtocart_buttoncontinue',
+    '#webaddtocart_buttoncontinue',
+    '#addtocart_buttoncontinue',
     '#webcart_buttoncontinue',
     '#webcart_buttonaddtocart',
     '[id*="headcount" i][id*="continue" i]',
     '[name*="headcount" i][name*="continue" i]',
+    '[id*="addtocart" i][id*="continue" i]',
+    '[name*="addtocart" i][name*="continue" i]',
+    '[id*="buttonaddtocart" i]',
+    '[name*="buttonaddtocart" i]',
     '[id*="buttoncontinue" i]',
     '[name*="buttoncontinue" i]',
     'input[type="submit"]',
@@ -1586,7 +1644,7 @@ async function controlLabel(locator) {
 function isSafeCartPromptLabel(label, isHeadcountPrompt) {
   const text = String(label || '');
   if (/proceed\s+to\s+checkout|checkout|payment|pay|remove|delete|cancel|back|sign\s*out|log\s*out/i.test(text)) return false;
-  if (/continue|next|submit|save|update|add\s+to\s+cart|add\s+selected/i.test(text)) return true;
+  if (/continue|next|submit|save|update|add\s+to\s+cart|add\s+selected|\bagree\b/i.test(text)) return true;
   return isHeadcountPrompt && /^ok$/i.test(text);
 }
 
