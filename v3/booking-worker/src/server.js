@@ -47,6 +47,7 @@ app.post('/reserve', async (req, res) => {
       code: result.code,
       selectionSource: result.selectionSource,
       addToCart: result.addToCartResult,
+      prompts: result.promptResults,
       cart: result.cartState && {
         confirmed: result.cartState.confirmed,
         itemCount: result.cartState.itemCount,

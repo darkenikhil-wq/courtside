@@ -65,6 +65,7 @@ export async function reserveWithWebtrac(payload) {
       addResults.push(await callUpdateSelection(page, selectionUrl));
     }
     const addToCartResult = await addSelectedItemsToCart(page, searchUrl);
+    const promptResults = await completeCartPrompts(page, payload);
 
     const cartState = await confirmCartState(page, searchUrl);
     const cartReady = addResults.every(r => r.ok) && cartState.confirmed;
@@ -78,6 +79,7 @@ export async function reserveWithWebtrac(payload) {
       dryRun: false,
       addResults,
       addToCartResult,
+      promptResults,
       selectionSource,
       cartState,
     };
@@ -214,12 +216,14 @@ async function inspectCartPage(page) {
   const grandTotal = compact.match(/Grand Total Fees Due\s+\$\s*([0-9.,]+)/i);
   const amountToday = compact.match(/Amount To Be Paid Today:\s+\$\s*([0-9.,]+)/i);
   const itemCount = cartCount ? Number(cartCount[1]) : 0;
-  const hasCartLineItem = /\bRemove\b.+\$\s*[0-9,.]+/i.test(compact) || /Tennis Court|Pickleball|Volleyball/i.test(compact);
+  const isCartPage = /cart\.html|shopping\s+cart|cart\s*\(/i.test(`${page.url()} ${compact}`);
+  const hasCartLineItem = /\bRemove\b.{0,500}\$\s*[0-9,.]+/i.test(compact)
+    || /Facility\s+Reservation.{0,500}\$\s*[0-9,.]+/i.test(compact);
   return {
     url: page.url(),
     title: await page.title().catch(() => ''),
     itemCount,
-    confirmed: itemCount > 0 || hasCartLineItem,
+    confirmed: itemCount > 0 || (isCartPage && hasCartLineItem),
     grandTotal: grandTotal ? `$${grandTotal[1]}` : null,
     amountToday: amountToday ? `$${amountToday[1]}` : null,
     hasProceedToCheckout: /Proceed To Checkout/i.test(compact),
@@ -355,6 +359,159 @@ async function addSelectedItemsToCart(page, searchUrl) {
   }
 
   return formResult;
+}
+
+async function completeCartPrompts(page, payload) {
+  const results = [];
+  const headcount = String(payload.headcount || 2);
+
+  for (let step = 1; step <= 5; step += 1) {
+    await page.waitForLoadState('domcontentloaded', { timeout: 15000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {});
+    await page.waitForTimeout(300);
+
+    const bodyText = await page.locator('body').innerText({ timeout: 5000 }).catch(() => '');
+    const compact = bodyText.replace(/\s+/g, ' ').trim();
+    const cartState = await inspectCartPage(page).catch(() => null);
+
+    if (cartState?.confirmed) {
+      results.push({ step, action: 'cart_confirmed', url: page.url() });
+      break;
+    }
+
+    if (isCheckoutOrPaymentPage(compact)) {
+      results.push({ step, action: 'stopped_before_checkout', url: page.url() });
+      break;
+    }
+
+    const looksLikeHeadcount = /facility\s*head\s*count|head\s*count|number\s+attending|participants?|attendees?/i.test(compact);
+    const fillResult = looksLikeHeadcount ? await fillHeadcountFields(page, headcount) : { filled: 0 };
+    const clickResult = await clickSafeCartContinue(page, looksLikeHeadcount);
+
+    results.push({
+      step,
+      action: clickResult.clicked ? 'continued_prompt' : 'no_prompt_action',
+      url: page.url(),
+      looksLikeHeadcount,
+      fillResult,
+      clickResult,
+      snippet: compact.slice(0, 500),
+    });
+
+    if (!clickResult.clicked) break;
+  }
+
+  return results;
+}
+
+function isCheckoutOrPaymentPage(text) {
+  return /proceed\s+to\s+checkout|payment\s+method|amount\s+to\s+be\s+paid\s+today|credit\s+card|checkout\/payment/i.test(text || '');
+}
+
+async function fillHeadcountFields(page, headcount) {
+  return page.evaluate((value) => {
+    const controls = Array.from(document.querySelectorAll('input, select, textarea'));
+
+    function visible(el) {
+      if (el.type === 'hidden') return false;
+      const style = window.getComputedStyle(el);
+      const rect = el.getBoundingClientRect();
+      return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0;
+    }
+
+    function contextText(el) {
+      const id = el.getAttribute('id');
+      const labels = [
+        el.getAttribute('name'),
+        id,
+        el.getAttribute('aria-label'),
+        el.getAttribute('placeholder'),
+        id ? document.querySelector(`label[for="${CSS.escape(id)}"]`)?.textContent : '',
+        el.closest('tr, .form-group, .form__row, li, p, div')?.textContent,
+      ];
+      return labels.filter(Boolean).join(' ');
+    }
+
+    const candidates = controls.filter((el) => {
+      if (!visible(el) || el.disabled || el.readOnly) return false;
+      if (el.tagName === 'SELECT') return true;
+      const type = String(el.getAttribute('type') || 'text').toLowerCase();
+      if (!['text', 'number', 'tel'].includes(type)) return false;
+      const text = contextText(el);
+      return /head\s*count|facility\s*head\s*count|attend|participant|people|quantity|qty|count/i.test(text)
+        || String(el.value || '').trim() === '0';
+    });
+
+    const details = [];
+    for (const el of candidates) {
+      if (el.tagName === 'SELECT') {
+        const option = Array.from(el.options).find((opt) => String(opt.value) === value || String(opt.textContent || '').trim() === value);
+        if (!option) continue;
+        el.value = option.value;
+      } else {
+        el.value = value;
+      }
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+      details.push({
+        tag: el.tagName.toLowerCase(),
+        type: el.getAttribute('type') || '',
+        name: el.getAttribute('name') || '',
+        id: el.getAttribute('id') || '',
+      });
+    }
+
+    return { filled: details.length, details };
+  }, headcount);
+}
+
+async function clickSafeCartContinue(page, isHeadcountPrompt) {
+  const selectors = [
+    '#frheadcount_buttoncontinue',
+    '#webcart_buttoncontinue',
+    '#webcart_buttonaddtocart',
+    '[id*="headcount" i][id*="continue" i]',
+    '[name*="headcount" i][name*="continue" i]',
+    '[id*="buttoncontinue" i]',
+    '[name*="buttoncontinue" i]',
+    'input[type="submit"]',
+    'button[type="submit"]',
+    'button',
+    'a',
+  ];
+
+  for (const selector of selectors) {
+    const locators = await page.locator(selector).filter({ visible: true }).all().catch(() => []);
+    for (const locator of locators) {
+      const label = await controlLabel(locator);
+      if (!label) continue;
+      if (!isSafeCartPromptLabel(label, isHeadcountPrompt)) continue;
+
+      await Promise.all([
+        page.waitForLoadState('domcontentloaded', { timeout: 15000 }).catch(() => {}),
+        locator.click(),
+      ]);
+      await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+      return { clicked: true, selector, label: label.replace(/\s+/g, ' ').trim(), url: page.url() };
+    }
+  }
+
+  return { clicked: false, reason: 'safe_continue_not_found' };
+}
+
+async function controlLabel(locator) {
+  const text = await locator.innerText().catch(() => '');
+  const value = await locator.getAttribute('value').catch(() => '');
+  const aria = await locator.getAttribute('aria-label').catch(() => '');
+  const title = await locator.getAttribute('title').catch(() => '');
+  return String(text || value || aria || title || '').replace(/\s+/g, ' ').trim();
+}
+
+function isSafeCartPromptLabel(label, isHeadcountPrompt) {
+  const text = String(label || '');
+  if (/proceed\s+to\s+checkout|checkout|payment|pay|remove|delete|cancel|back|sign\s*out|log\s*out/i.test(text)) return false;
+  if (/continue|next|submit|save|update|add\s+to\s+cart|add\s+selected/i.test(text)) return true;
+  return isHeadcountPrompt && /^ok$/i.test(text);
 }
 
 async function extractSelectionUrlsFromPage(page, payload) {
