@@ -151,6 +151,18 @@ PLAYWRIGHT_CONNECT_TIMEOUT_MS=60000
 That keeps the Courtside API flow the same while replacing Render's local
 Chromium/IP profile, which is the part WebTrac is currently rejecting.
 
+For Browserless, you can either paste the full WebSocket URL into
+`PLAYWRIGHT_WS_ENDPOINT`, or set the shortcut vars and let the worker build the
+stealth endpoint:
+
+```text
+BROWSERLESS_TOKEN=<browserless-api-token>
+BROWSERLESS_REGION=sfo
+BROWSERLESS_BROWSER=chrome
+BROWSERLESS_STEALTH=true
+PLAYWRIGHT_CONNECT_MODE=cdp
+```
+
 ## Connecting v3
 
 For local testing, expose this service or run a small tunnel, then set the v3

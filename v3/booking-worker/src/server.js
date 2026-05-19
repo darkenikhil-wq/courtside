@@ -22,7 +22,8 @@ app.get('/health', (req, res) => {
     dryRun: config.dryRun,
     headless: config.headless,
     browserProfile: 'browser-like-v1',
-    browserRuntime: config.browserWsEndpoint ? `remote:${config.browserConnectMode}` : 'local',
+    browserRuntime: config.browserRuntimeLabel,
+    browserConnectMode: config.browserConnectMode,
   });
 });
 

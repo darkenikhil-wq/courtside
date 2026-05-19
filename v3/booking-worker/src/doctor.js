@@ -51,7 +51,8 @@ console.log('');
 console.log(`DRY_RUN=${config.dryRun}`);
 console.log(`HEADLESS=${config.headless}`);
 console.log(`PORT=${config.port}`);
-console.log(`BROWSER_RUNTIME=${config.browserWsEndpoint ? `remote:${config.browserConnectMode}` : 'local'}`);
+console.log(`BROWSER_RUNTIME=${config.browserRuntimeLabel}`);
+console.log(`PLAYWRIGHT_CONNECT_MODE=${config.browserConnectMode}`);
 console.log(`WEBTRAC_CLEAR_CART_BEFORE_RESERVE=${config.clearCartBeforeReserve}`);
 console.log(`ALLOW_WEBTRAC_FINAL_PAYMENT=${config.allowWebtracFinalPayment}`);
 

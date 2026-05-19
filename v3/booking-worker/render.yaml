@@ -32,6 +32,14 @@ services:
         sync: false
       - key: PLAYWRIGHT_WS_ENDPOINT
         sync: false
+      - key: BROWSERLESS_TOKEN
+        sync: false
+      - key: BROWSERLESS_REGION
+        value: sfo
+      - key: BROWSERLESS_BROWSER
+        value: chrome
+      - key: BROWSERLESS_STEALTH
+        value: true
       - key: WEBTRAC_BILL_FIRST_NAME
         sync: false
       - key: WEBTRAC_BILL_LAST_NAME

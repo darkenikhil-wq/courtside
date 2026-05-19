@@ -1,5 +1,11 @@
 import 'dotenv/config';
 
+const browserlessToken = process.env.BROWSERLESS_TOKEN || '';
+const browserlessRegion = process.env.BROWSERLESS_REGION || 'sfo';
+const browserlessBrowser = process.env.BROWSERLESS_BROWSER || 'chrome';
+const browserlessStealth = process.env.BROWSERLESS_STEALTH !== 'false';
+const explicitBrowserEndpoint = process.env.PLAYWRIGHT_WS_ENDPOINT || process.env.BROWSER_WS_ENDPOINT || '';
+
 export const config = {
   port: Number(process.env.PORT || 8787),
   workerToken: process.env.BOOKING_WORKER_TOKEN || '',
@@ -9,9 +15,14 @@ export const config = {
   headless: process.env.HEADLESS !== 'false',
   slowMo: Number(process.env.SLOW_MO_MS || 0),
   chromeExecutablePath: process.env.CHROME_EXECUTABLE_PATH || '',
-  browserWsEndpoint: process.env.PLAYWRIGHT_WS_ENDPOINT || process.env.BROWSER_WS_ENDPOINT || '',
+  browserWsEndpoint: explicitBrowserEndpoint || browserlessEndpoint(),
   browserConnectMode: (process.env.PLAYWRIGHT_CONNECT_MODE || 'cdp').toLowerCase(),
   browserConnectTimeoutMs: Number(process.env.PLAYWRIGHT_CONNECT_TIMEOUT_MS || 60000),
+  browserRuntimeLabel: explicitBrowserEndpoint
+    ? 'remote:custom'
+    : browserlessToken
+      ? `remote:browserless:${browserlessStealth ? 'stealth' : 'standard'}`
+      : 'local',
   artifactDir: process.env.PLAYWRIGHT_ARTIFACT_DIR || new URL('../.playwright-artifacts', import.meta.url).pathname,
   clearCartBeforeReserve: process.env.WEBTRAC_CLEAR_CART_BEFORE_RESERVE !== 'false',
   allowWebtracFinalPayment: process.env.ALLOW_WEBTRAC_FINAL_PAYMENT === 'true',
@@ -29,6 +40,14 @@ export const config = {
     cardCvc: process.env.WEBTRAC_CARD_CVC || '',
   },
 };
+
+function browserlessEndpoint() {
+  if (!browserlessToken) return '';
+  const browser = browserlessBrowser === 'chromium' ? 'chromium' : 'chrome';
+  const stealthPath = browserlessStealth ? '/stealth' : '';
+  const params = new URLSearchParams({ token: browserlessToken });
+  return `wss://production-${browserlessRegion}.browserless.io/${browser}${stealthPath}?${params.toString()}`;
+}
 
 export function assertRuntimeConfig() {
   const missing = requiredEnvStatus().filter((item) => !item.ok).map((item) => item.name);
