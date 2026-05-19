@@ -4,7 +4,11 @@
 //   GET /.netlify/functions/availability?court=QUINC&date=05/20/2026&sport=TENNIS
 //
 // Returns:
-//   { slots: [{ start: "08:00", available: true }, { start: "08:30", available: false }, ...], fetchedAt }
+//   {
+//     slots: [{ start: "08:00", available: true }, ...], // aggregate "any unit"
+//     courts: [{ id, label, slots: [{ start, available, bookingUrl }] }],
+//     fetchedAt
+//   }
 //
 // Uses ScraperAPI to fetch WebTrac through a real-browser proxy
 // (plain server-side fetch is 403'd by their bot protection).
@@ -51,8 +55,8 @@ exports.handler = async (event) => {
       return jsonResponse(502, { error: `Scraper returned ${res.status}` });
     }
     const html = await res.text();
-    const slots = parseSlots(html);
-    return jsonResponse(200, { slots, fetchedAt: Date.now() }, {
+    const availability = parseAvailability(html);
+    return jsonResponse(200, { ...availability, fetchedAt: Date.now() }, {
       // CDN-cache per court+date for 60s — many users on same combo hit cache, not scraper.
       'Cache-Control': 'public, max-age=60',
     });
@@ -74,24 +78,37 @@ exports.handler = async (event) => {
 //       <span> 9:30 am - 11:00 am</span><span>Unavailable</span>
 //     </a>
 //
-// Each location (e.g. Quincy) shows N courts; the same time slot may appear
-// multiple times. For our UI we want "is ANY court at this location available
-// at this time" — so we OR availability across all courts.
+// Each location (e.g. Quincy) shows N court units; the same time slot may appear
+// multiple times. The API returns both per-unit availability and an aggregate
+// "any unit" list for backwards compatibility.
 function parseSlots(html) {
+  return parseAvailability(html).slots;
+}
+
+function parseAvailability(html) {
   // 'HH:MM' (24h) → { available, bookingUrl? }
   // bookingUrl is the WebTrac UpdateSelection AJAX link. It is metadata for the
   // future backend booking adapter; do not navigate a browser directly to it.
   // Aggregated across all courts at this location: prefer an AVAILABLE entry
   // (with its URL) over an unavailable one for the same time.
-  const slotMap = new Map();
+  const aggregateSlotMap = new Map();
+  const courtMap = new Map();
+  let currentCourt = null;
+  let fallbackIndex = 0;
 
-  const linkRe = /<a\s+([^>]*?cart-button[^>]*?)>([\s\S]*?)<\/a>/gi;
+  // Labels are sometimes not anchors, so scan every cart-button-ish element in
+  // DOM order and let state-label elements set the current court unit.
+  const linkRe = /<([a-z][\w:-]*)\s+([^>]*?cart-button[^>]*?)>([\s\S]*?)<\/\1>/gi;
   let m;
   while ((m = linkRe.exec(html)) !== null) {
-    const attrs = m[1];
-    const inner = m[2];
+    const attrs = m[2];
+    const inner = m[3];
 
-    if (/cart-button--state-label/.test(attrs)) continue;
+    if (/cart-button--state-label/.test(attrs)) {
+      const label = cleanHtmlText(inner) || cleanHtmlText(attributeValue(attrs, 'title')) || `Court ${courtMap.size + 1}`;
+      currentCourt = ensureCourt(courtMap, label);
+      continue;
+    }
     if (!/cart-button--state-block/.test(attrs)) continue;
 
     const t = inner.match(/(\d{1,2}):(\d{2})\s*([ap]m)\s*-\s*(\d{1,2}):(\d{2})\s*([ap]m)/i);
@@ -110,10 +127,7 @@ function parseSlots(html) {
       const hrefMatch = attrs.match(/href\s*=\s*"([^"#][^"]*)"/i);
       if (hrefMatch && /UpdateSelection/i.test(hrefMatch[1])) {
         // HTML entities → real chars (WebTrac mostly emits raw &, but be safe).
-        bookingUrl = hrefMatch[1]
-          .replace(/&amp;/g, '&')
-          .replace(/&#x2F;/gi, '/')
-          .replace(/&quot;/g, '"');
+        bookingUrl = decodeHtmlEntities(hrefMatch[1]);
       }
     }
 
@@ -121,31 +135,115 @@ function parseSlots(html) {
     const endMins   = to24Mins(parseInt(t[4], 10), parseInt(t[5], 10), t[6]);
     if (!Number.isFinite(startMins) || !Number.isFinite(endMins) || endMins <= startMins) continue;
 
+    if (!currentCourt) {
+      fallbackIndex += 1;
+      currentCourt = ensureCourt(courtMap, `Court ${fallbackIndex}`);
+    }
+
     // Walk every 30-min increment inside [start, end). A 1.5h booking marks
     // 3 separate 30-min slots as unavailable.
+    let unitBookingUrl = bookingUrl;
     for (let mins = startMins; mins < endMins; mins += 30) {
       const key = minsToHHMM(mins);
-      const prev = slotMap.get(key);
-      if (prev === undefined) {
-        slotMap.set(key, { available: isAvailable, bookingUrl });
-      } else if (isAvailable && !prev.available) {
-        // Promote: switch this slot from unavailable to available, with URL.
-        slotMap.set(key, { available: true, bookingUrl });
-      } else if (isAvailable && prev.available && !prev.bookingUrl && bookingUrl) {
-        // Same slot, but this entry has a URL the earlier one lacked.
-        slotMap.set(key, { available: true, bookingUrl });
-      }
+      mergeSlot(currentCourt.slotMap, key, isAvailable, unitBookingUrl);
+      mergeSlot(aggregateSlotMap, key, isAvailable, unitBookingUrl);
+
       // Only the first 30-min slot of a multi-slot booking has the "real" URL;
       // subsequent slot keys within the same booking block don't (they map to
       // the same slot anyway, and the bookingUrl for the START is what matters).
       // Set bookingUrl=null for non-first iterations to avoid misattributing.
-      bookingUrl = null;
+      unitBookingUrl = null;
     }
   }
 
+  const courts = Array.from(courtMap.values())
+    .map((court) => ({
+      id: court.id,
+      label: court.label,
+      slots: slotMapToSlots(court.slotMap),
+    }))
+    .filter((court) => court.slots.length)
+    .sort((a, b) => courtSortLabel(a.label).localeCompare(courtSortLabel(b.label), undefined, { numeric: true }));
+
+  return {
+    slots: slotMapToSlots(aggregateSlotMap),
+    courts,
+    courtCount: courts.length,
+  };
+}
+
+function mergeSlot(slotMap, key, isAvailable, bookingUrl) {
+  const prev = slotMap.get(key);
+  if (prev === undefined) {
+    slotMap.set(key, { available: isAvailable, bookingUrl });
+  } else if (isAvailable && !prev.available) {
+    slotMap.set(key, { available: true, bookingUrl });
+  } else if (isAvailable && prev.available && !prev.bookingUrl && bookingUrl) {
+    slotMap.set(key, { available: true, bookingUrl });
+  }
+}
+
+function slotMapToSlots(slotMap) {
   return Array.from(slotMap.entries())
     .map(([start, info]) => ({ start, available: info.available, bookingUrl: info.bookingUrl || null }))
     .sort((a, b) => a.start.localeCompare(b.start));
+}
+
+function ensureCourt(courtMap, label) {
+  const normalized = normalizeCourtLabel(label);
+  const id = slugify(normalized || `court-${courtMap.size + 1}`);
+  if (!courtMap.has(id)) {
+    courtMap.set(id, {
+      id,
+      label: normalized || `Court ${courtMap.size + 1}`,
+      slotMap: new Map(),
+    });
+  }
+  return courtMap.get(id);
+}
+
+function normalizeCourtLabel(label) {
+  return cleanHtmlText(label)
+    .replace(/\bFacility Reservation\b/gi, '')
+    .replace(/\bBook Now\b/gi, '')
+    .replace(/\bUnavailable\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function courtSortLabel(label) {
+  return String(label || '').replace(/^.*?(\d+)$/, 'Court $1');
+}
+
+function slugify(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/&[a-z0-9#]+;/gi, ' ')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'court';
+}
+
+function cleanHtmlText(value) {
+  return decodeHtmlEntities(String(value || '')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim());
+}
+
+function attributeValue(attrs, name) {
+  const re = new RegExp(`${name}\\s*=\\s*"([^"]*)"`, 'i');
+  return attrs.match(re)?.[1] || '';
+}
+
+function decodeHtmlEntities(value) {
+  return String(value || '')
+    .replace(/&amp;/g, '&')
+    .replace(/&#x2F;/gi, '/')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ');
 }
 
 function to24Mins(h, m, ampm) {

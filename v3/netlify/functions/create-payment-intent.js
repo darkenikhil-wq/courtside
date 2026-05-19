@@ -41,7 +41,11 @@ exports.handler = async (event) => {
   params.set('metadata[capture_method]', captureMethod);
   params.set('metadata[source]', 'courtside-v3-qa');
   if (purpose === 'court_booking') {
-    params.set('metadata[court]', String(booking.courtName || booking.courtCode || '').slice(0, 120));
+    const courtLabel = [
+      booking.courtName || booking.courtCode,
+      booking.courtUnitDisplayName || booking.courtUnitName,
+    ].filter(Boolean).join(' - ');
+    params.set('metadata[court]', String(courtLabel).slice(0, 120));
     params.set('metadata[date]', String(booking.date || '').slice(0, 20));
     params.set('metadata[start]', String(booking.start || '').slice(0, 20));
   }

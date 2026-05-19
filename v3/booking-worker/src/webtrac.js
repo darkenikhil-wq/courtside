@@ -585,18 +585,22 @@ function expectedCartMatch(cartText, booking) {
   const text = normalizeMatchText(cartText);
   const expected = expectedCartTerms(booking);
   const court = expected.courts.some((value) => text.includes(normalizeMatchText(value)));
+  const unit = !expected.units.length || expected.units.some((value) => text.includes(normalizeMatchText(value)));
   const date = expected.dates.some((value) => text.includes(normalizeMatchText(value)));
   const start = expected.starts.some((value) => text.includes(normalizeMatchText(value)));
   const end = expected.ends.some((value) => text.includes(normalizeMatchText(value)));
   return {
-    ok: court && date && start && end,
+    ok: court && unit && date && start && end,
     court,
+    unit,
     date,
     start,
     end,
     expected: {
       courtName: booking.courtName || null,
       courtCode: booking.courtCode || null,
+      courtUnitName: booking.courtUnitName || null,
+      courtUnitDisplayName: booking.courtUnitDisplayName || null,
       date: booking.date || null,
       start: booking.start || null,
       end: booking.end || null,
@@ -612,10 +616,32 @@ function expectedCartTerms(booking) {
       booking.courtId,
       String(booking.courtName || '').replace(/\s+(park|center|ms)$/i, ''),
     ]),
+    units: courtUnitTerms(booking),
     dates: dateTerms(booking.date, booking.dateWebtrac),
     starts: timeTerms(booking.start),
     ends: timeTerms(booking.end),
   };
+}
+
+function courtUnitTerms(booking) {
+  const rawTerms = uniqueTerms([
+    booking.courtUnitName,
+    booking.courtUnitDisplayName,
+    booking.courtUnitId,
+  ]);
+  const terms = [...rawTerms];
+  for (const value of rawTerms) {
+    const text = String(value);
+    const match = text.match(/\b(?:court|ct)\s*#?\s*([0-9]+[A-Z]?)\b/i)
+      || text.match(/#\s*([0-9]+[A-Z]?)\b/i)
+      || text.match(/\b([0-9]+[A-Z]?)\b$/i);
+    if (match) {
+      terms.push(`Court ${match[1]}`);
+      terms.push(`Court #${match[1]}`);
+      terms.push(`#${match[1]}`);
+    }
+  }
+  return uniqueTerms(terms);
 }
 
 function dateTerms(isoDate, webtracDate) {
