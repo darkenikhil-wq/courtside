@@ -36,8 +36,8 @@ services:
         sync: false
       - key: BROWSERLESS_REGION
         value: sfo
-      - key: BROWSERLESS_BROWSER
-        value: chrome
+      - key: BROWSERLESS_ROUTE
+        value: stealth
       - key: BROWSERLESS_STEALTH
         value: true
       - key: WEBTRAC_BILL_FIRST_NAME

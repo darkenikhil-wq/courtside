@@ -158,7 +158,7 @@ stealth endpoint:
 ```text
 BROWSERLESS_TOKEN=<browserless-api-token>
 BROWSERLESS_REGION=sfo
-BROWSERLESS_BROWSER=chrome
+BROWSERLESS_ROUTE=stealth
 BROWSERLESS_STEALTH=true
 PLAYWRIGHT_CONNECT_MODE=cdp
 ```

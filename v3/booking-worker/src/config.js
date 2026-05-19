@@ -2,8 +2,8 @@ import 'dotenv/config';
 
 const browserlessToken = process.env.BROWSERLESS_TOKEN || '';
 const browserlessRegion = process.env.BROWSERLESS_REGION || 'sfo';
-const browserlessBrowser = process.env.BROWSERLESS_BROWSER || 'chrome';
 const browserlessStealth = process.env.BROWSERLESS_STEALTH !== 'false';
+const browserlessRoute = process.env.BROWSERLESS_ROUTE || (browserlessStealth ? 'stealth' : 'chrome');
 const explicitBrowserEndpoint = process.env.PLAYWRIGHT_WS_ENDPOINT || process.env.BROWSER_WS_ENDPOINT || '';
 
 export const config = {
@@ -43,10 +43,13 @@ export const config = {
 
 function browserlessEndpoint() {
   if (!browserlessToken) return '';
-  const browser = browserlessBrowser === 'chromium' ? 'chromium' : 'chrome';
-  const stealthPath = browserlessStealth ? '/stealth' : '';
+  const route = normalizeBrowserlessRoute(browserlessRoute);
   const params = new URLSearchParams({ token: browserlessToken });
-  return `wss://production-${browserlessRegion}.browserless.io/${browser}${stealthPath}?${params.toString()}`;
+  return `wss://production-${browserlessRegion}.browserless.io/${route}?${params.toString()}`;
+}
+
+function normalizeBrowserlessRoute(route) {
+  return String(route || 'stealth').replace(/^\/+/, '').replace(/\/+$/, '') || 'stealth';
 }
 
 export function assertRuntimeConfig() {
