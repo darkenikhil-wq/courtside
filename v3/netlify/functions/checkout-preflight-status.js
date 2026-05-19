@@ -2,15 +2,21 @@ exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') {
     return jsonResponse(204, {});
   }
-  if (event.httpMethod !== 'POST') {
-    return jsonResponse(405, { error: 'Use POST' });
+  if (event.httpMethod !== 'GET') {
+    return jsonResponse(405, { error: 'Use GET' });
   }
 
-  const body = parseJson(event.body);
-  if (!body.ok) return jsonResponse(400, { error: 'Invalid JSON body' });
+  const jobId = (event.queryStringParameters && event.queryStringParameters.jobId || '').trim();
+  if (!/^[a-f0-9-]{20,}$/i.test(jobId)) {
+    return jsonResponse(400, {
+      status: 'rejected',
+      code: 'WEBTRAC_CHECKOUT_JOB_REQUIRED',
+      message: 'Missing checkout job id.',
+    });
+  }
 
-  const startUrl = finalizerStartUrl();
-  if (!startUrl) {
+  const statusUrl = finalizerStatusUrl(jobId);
+  if (!statusUrl) {
     return jsonResponse(501, {
       status: 'not_configured',
       code: 'WEBTRAC_FINALIZE_ADAPTER_REQUIRED',
@@ -19,31 +25,23 @@ exports.handler = async (event) => {
   }
 
   try {
-    const headers = { 'Content-Type': 'application/json' };
+    const headers = {};
     const token = process.env.WEBTRAC_FINALIZE_ADAPTER_TOKEN || process.env.WEBTRAC_BOOKING_ADAPTER_TOKEN || '';
     if (token) headers.Authorization = `Bearer ${token}`;
 
-    const res = await fetch(startUrl, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        booking: body.value.booking || null,
-        stopBeforeSubmit: true,
-        requestedAt: Date.now(),
-      }),
-    });
+    const res = await fetch(statusUrl, { headers });
     const text = await res.text();
     let webtrac;
     try { webtrac = JSON.parse(text); }
     catch (e) { webtrac = { status: res.ok ? 'accepted' : 'adapter_error', message: text }; }
     webtrac.httpStatus = res.status;
 
-    if (res.status === 202 && webtrac.jobId) {
+    if (res.status === 202) {
       return jsonResponse(202, {
-        status: 'preflight_started',
-        code: webtrac.code || 'WEBTRAC_CHECKOUT_STARTED',
-        message: webtrac.message || 'Courtside is checking Arlington/WebTrac checkout.',
-        jobId: webtrac.jobId,
+        status: 'preflight_running',
+        code: webtrac.code || 'WEBTRAC_CHECKOUT_RUNNING',
+        message: webtrac.message || 'Courtside is still checking Arlington/WebTrac checkout.',
+        jobId: webtrac.jobId || jobId,
         pollAfterMs: webtrac.pollAfterMs || 2000,
       });
     }
@@ -58,14 +56,14 @@ exports.handler = async (event) => {
   }
 };
 
-function finalizerStartUrl() {
+function finalizerStatusUrl(jobId) {
   const url = finalizerUrl();
   if (!url) return '';
   try {
     const parsed = new URL(url);
-    parsed.pathname = parsed.pathname.replace(/\/checkout\/finalize\/?$/, '/checkout/finalize/start');
-    if (!/\/checkout\/finalize\/start\/?$/.test(parsed.pathname)) {
-      parsed.pathname = `${parsed.pathname.replace(/\/$/, '')}/start`;
+    parsed.pathname = parsed.pathname.replace(/\/checkout\/finalize\/?$/, `/checkout/finalize/status/${encodeURIComponent(jobId)}`);
+    if (!/\/checkout\/finalize\/status\/[^/]+\/?$/.test(parsed.pathname)) {
+      parsed.pathname = `${parsed.pathname.replace(/\/$/, '')}/status/${encodeURIComponent(jobId)}`;
     }
     return parsed.toString();
   } catch {
@@ -116,17 +114,9 @@ function summarizeWebtrac(webtrac) {
       grandTotal: webtrac.cart.grandTotal,
       expectedMatch: webtrac.cart.expectedMatch || null,
     } : null,
-    fillResult: webtrac.fillResult || null,
+    fillResult: webtrac.fillResult || webtrac.fill || null,
     missing: webtrac.missing || null,
   };
-}
-
-function parseJson(raw) {
-  try {
-    return { ok: true, value: JSON.parse(raw || '{}') };
-  } catch (e) {
-    return { ok: false, value: null };
-  }
 }
 
 function jsonResponse(statusCode, body) {

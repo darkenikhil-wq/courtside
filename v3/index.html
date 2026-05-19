@@ -2332,16 +2332,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           body: JSON.stringify({ booking: bookingPayload }),
         });
         const data = await res.json().catch(() => ({}));
-        const ready = res.ok && data.status === 'ready';
-        const guardOff = ready && data.webtrac?.allowWebtracFinalPayment !== true;
-        return {
-          ready,
-          code: data.code,
-          message: guardOff
-            ? 'Arlington/WebTrac checkout is ready, but final WebTrac payment is still disabled. No card authorization was created.'
-            : data.message,
-          webtrac: data.webtrac,
-        };
+        if (res.status === 202 && data.jobId) {
+          return pollCheckoutPreflightStatus(data.jobId, data.pollAfterMs);
+        }
+        return normalizePreflightResult(res.ok, data);
       } catch (e) {
         return {
           ready: false,
@@ -2349,6 +2343,37 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           message: 'Final booking service is not reachable. No card authorization was created.',
         };
       }
+    }
+
+    async function pollCheckoutPreflightStatus(jobId, pollAfterMs) {
+      let waitMs = Math.max(1000, Number(pollAfterMs) || 2000);
+      for (let attempt = 0; attempt < 90; attempt += 1) {
+        await new Promise(resolve => setTimeout(resolve, waitMs));
+        const res = await fetch(`/.netlify/functions/checkout-preflight-status?jobId=${encodeURIComponent(jobId)}`, {
+          headers: { 'Cache-Control': 'no-store' },
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.status !== 202) return normalizePreflightResult(res.ok, data);
+        waitMs = Math.max(1000, Number(data.pollAfterMs) || waitMs);
+      }
+      return {
+        ready: false,
+        code: 'WEBTRAC_PREFLIGHT_TIMEOUT',
+        message: 'Arlington/WebTrac checkout is still running. No card authorization was created.',
+      };
+    }
+
+    function normalizePreflightResult(ok, data) {
+      const ready = ok && data.status === 'ready';
+      const guardOff = ready && data.webtrac?.allowWebtracFinalPayment !== true;
+      return {
+        ready,
+        code: data.code,
+        message: guardOff
+          ? 'Arlington/WebTrac checkout is ready, but final WebTrac payment is still disabled. No card authorization was created.'
+          : data.message,
+        webtrac: data.webtrac,
+      };
     }
 
     async function preflightWithLocalWorker(bookingPayload, localWorker) {

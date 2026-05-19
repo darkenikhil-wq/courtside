@@ -8,6 +8,7 @@ import { finalizeWebtracCheckout, inspectCheckoutFlow, reserveWithWebtrac } from
 
 const app = express();
 const reserveJobs = new Map();
+const checkoutJobs = new Map();
 const RESERVE_JOB_TTL_MS = 30 * 60 * 1000;
 const RESERVE_JOB_STORE_DIR = config.reserveJobStoreDir;
 app.use((req, res, next) => {
@@ -33,7 +34,7 @@ app.get('/health', (req, res) => {
     browserlessTimeoutSeconds: config.browserlessTimeoutSeconds,
     browserlessProxyEnabled: config.browserlessProxyEnabled,
     reserveJobStore: RESERVE_JOB_STORE_DIR,
-    workerBuild: 'checkout-preflight-guard-v1',
+    workerBuild: 'async-checkout-preflight-v1',
   });
 });
 
@@ -230,6 +231,71 @@ app.post('/checkout/finalize', async (req, res) => {
   }
 });
 
+app.post('/checkout/finalize/start', async (req, res) => {
+  if (!isAuthorized(req)) {
+    return res.status(401).json({
+      status: 'rejected',
+      code: 'UNAUTHORIZED',
+      message: 'Missing or invalid booking worker token.',
+    });
+  }
+
+  try {
+    assertRuntimeConfig();
+    const job = enqueueCheckoutJob(req.body || {});
+    return res.status(202).json({
+      status: 'checkout_started',
+      code: 'WEBTRAC_CHECKOUT_STARTED',
+      message: 'Courtside is checking Arlington/WebTrac checkout.',
+      jobId: job.id,
+      pollAfterMs: 2000,
+    });
+  } catch (e) {
+    res.status(e.code === 'MISSING_ENV' ? 500 : 502).json(errorPayload(e, 'WEBTRAC_FINALIZE_ERROR'));
+  }
+});
+
+app.get('/checkout/finalize/status/:jobId', async (req, res) => {
+  if (!isAuthorized(req)) {
+    return res.status(401).json({
+      status: 'rejected',
+      code: 'UNAUTHORIZED',
+      message: 'Missing or invalid booking worker token.',
+    });
+  }
+
+  const job = checkoutJobs.get(req.params.jobId) || await readCheckoutJob(req.params.jobId);
+  if (!job) {
+    return res.status(404).json({
+      status: 'not_found',
+      code: 'WEBTRAC_CHECKOUT_JOB_NOT_FOUND',
+      message: 'Checkout job was not found or has expired.',
+    });
+  }
+
+  if (job.status === 'queued' || job.status === 'running') {
+    return res.status(202).json({
+      status: 'checkout_running',
+      code: 'WEBTRAC_CHECKOUT_RUNNING',
+      message: 'Courtside is still checking Arlington/WebTrac checkout.',
+      jobId: job.id,
+      jobStatus: job.status,
+      pollAfterMs: 2000,
+      startedAt: job.startedAt || null,
+      updatedAt: job.updatedAt,
+    });
+  }
+
+  const statusCode = job.statusCode || (job.status === 'failed' ? 502 : 200);
+  return res.status(statusCode).json({
+    ...job.result,
+    jobId: job.id,
+    jobStatus: job.status,
+    startedAt: job.startedAt || null,
+    finishedAt: job.finishedAt || null,
+  });
+});
+
 app.listen(config.port, () => {
   console.log(`Courtside booking worker listening on http://localhost:${config.port}`);
   console.log(`DRY_RUN=${config.dryRun} HEADLESS=${config.headless}`);
@@ -285,6 +351,56 @@ function enqueueReserveJob(payload) {
   return job;
 }
 
+function enqueueCheckoutJob(payload) {
+  cleanupCheckoutJobs();
+  const job = {
+    id: crypto.randomUUID(),
+    status: 'queued',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    startedAt: null,
+    finishedAt: null,
+    result: null,
+    statusCode: 202,
+  };
+  checkoutJobs.set(job.id, job);
+  persistCheckoutJob(job);
+
+  setTimeout(async () => {
+    job.status = 'running';
+    job.startedAt = new Date().toISOString();
+    job.updatedAt = job.startedAt;
+    await persistCheckoutJob(job);
+    try {
+      const result = await finalizeWebtracCheckout(payload);
+      job.status = 'succeeded';
+      job.result = result;
+      job.statusCode = result.status === 'webtrac_confirmed' || result.status === 'webtrac_payment_ready' ? 200 : 502;
+      console.log('[checkout:job]', {
+        id: job.id,
+        status: result.status,
+        code: result.code,
+        allowWebtracFinalPayment: config.allowWebtracFinalPayment,
+      });
+    } catch (e) {
+      job.status = 'failed';
+      job.result = errorPayload(e, 'WEBTRAC_FINALIZE_ERROR');
+      job.statusCode = e.code === 'MISSING_ENV' || e.code === 'MISSING_PAYMENT_ENV' ? 500 : 502;
+      console.log('[checkout:job:error]', {
+        id: job.id,
+        code: e.code,
+        message: e.message || String(e),
+      });
+    } finally {
+      job.finishedAt = new Date().toISOString();
+      job.updatedAt = job.finishedAt;
+      await persistCheckoutJob(job);
+    }
+  }, 0);
+
+  return job;
+}
+
 async function persistReserveJob(job) {
   try {
     await fs.mkdir(RESERVE_JOB_STORE_DIR, { recursive: true });
@@ -313,8 +429,40 @@ async function readReserveJob(id) {
   }
 }
 
+async function persistCheckoutJob(job) {
+  try {
+    await fs.mkdir(RESERVE_JOB_STORE_DIR, { recursive: true });
+    const target = checkoutJobPath(job.id);
+    const tmp = `${target}.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`;
+    await fs.writeFile(tmp, JSON.stringify(job), 'utf8');
+    await fs.rename(tmp, target);
+  } catch (e) {
+    console.warn('[checkout:job:persist_failed]', { id: job.id, message: e.message || String(e) });
+  }
+}
+
+async function readCheckoutJob(id) {
+  if (!/^[a-f0-9-]{20,}$/i.test(id || '')) return null;
+  try {
+    const text = await fs.readFile(checkoutJobPath(id), 'utf8');
+    const job = JSON.parse(text);
+    const created = Date.parse(job.createdAt || '');
+    if (Number.isFinite(created) && created < Date.now() - RESERVE_JOB_TTL_MS) {
+      await fs.rm(checkoutJobPath(id), { force: true });
+      return null;
+    }
+    return job;
+  } catch {
+    return null;
+  }
+}
+
 function reserveJobPath(id) {
   return path.join(RESERVE_JOB_STORE_DIR, `${id}.json`);
+}
+
+function checkoutJobPath(id) {
+  return path.join(RESERVE_JOB_STORE_DIR, `checkout-${id}.json`);
 }
 
 function cleanupReserveJobs() {
@@ -322,6 +470,15 @@ function cleanupReserveJobs() {
   for (const [id, job] of reserveJobs) {
     const created = Date.parse(job.createdAt || '');
     if (Number.isFinite(created) && created < cutoff) reserveJobs.delete(id);
+  }
+  cleanupReserveJobFiles(cutoff);
+}
+
+function cleanupCheckoutJobs() {
+  const cutoff = Date.now() - RESERVE_JOB_TTL_MS;
+  for (const [id, job] of checkoutJobs) {
+    const created = Date.parse(job.createdAt || '');
+    if (Number.isFinite(created) && created < cutoff) checkoutJobs.delete(id);
   }
   cleanupReserveJobFiles(cutoff);
 }
