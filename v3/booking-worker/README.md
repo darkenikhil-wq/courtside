@@ -138,6 +138,19 @@ stop before final payment with `WEBTRAC_RECAPTCHA_REQUIRED`; do not try to bypas
 it. A production-grade version may need a hosted browser with a live operator
 view if WebTrac requires interactive verification.
 
+If WebTrac/Cloudflare blocks the Render browser before the login page loads,
+keep the Netlify app pointed at this worker but move the browser itself to a
+managed hosted-browser endpoint:
+
+```text
+PLAYWRIGHT_WS_ENDPOINT=wss://<hosted-browser-endpoint>
+PLAYWRIGHT_CONNECT_MODE=cdp
+PLAYWRIGHT_CONNECT_TIMEOUT_MS=60000
+```
+
+That keeps the Courtside API flow the same while replacing Render's local
+Chromium/IP profile, which is the part WebTrac is currently rejecting.
+
 ## Connecting v3
 
 For local testing, expose this service or run a small tunnel, then set the v3

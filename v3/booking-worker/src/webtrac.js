@@ -310,32 +310,8 @@ async function resetArtifactDir() {
 
 async function createBrowserSession() {
   await resetArtifactDir();
-  const browser = await chromium.launch({
-    headless: config.headless,
-    slowMo: config.slowMo,
-    executablePath: config.chromeExecutablePath || undefined,
-    artifactsPath: config.artifactDir,
-    args: [
-      '--disable-blink-features=AutomationControlled',
-      '--disable-dev-shm-usage',
-      '--disable-setuid-sandbox',
-      '--no-sandbox',
-      `--window-size=${BROWSER_VIEWPORT.width},${BROWSER_VIEWPORT.height}`,
-    ],
-  });
-  const context = await browser.newContext({
-    viewport: BROWSER_VIEWPORT,
-    screen: BROWSER_VIEWPORT,
-    deviceScaleFactor: 1,
-    hasTouch: false,
-    isMobile: false,
-    locale: 'en-US',
-    timezoneId: 'America/New_York',
-    userAgent: BROWSER_USER_AGENT,
-    extraHTTPHeaders: {
-      'Accept-Language': 'en-US,en;q=0.9',
-    },
-  });
+  const browser = await createBrowser();
+  const context = await createBrowserContext(browser);
 
   await context.addInitScript(() => {
     const defineGetter = (target, property, getter) => {
@@ -363,6 +339,58 @@ async function createBrowserSession() {
 
   const page = await context.newPage();
   return { browser, context, page };
+}
+
+async function createBrowser() {
+  if (config.browserWsEndpoint) {
+    const connectOptions = {
+      slowMo: config.slowMo,
+      timeout: config.browserConnectTimeoutMs,
+    };
+    if (config.browserConnectMode === 'playwright') {
+      return chromium.connect(config.browserWsEndpoint, connectOptions);
+    }
+    return chromium.connectOverCDP(config.browserWsEndpoint, connectOptions);
+  }
+
+  return chromium.launch({
+    headless: config.headless,
+    slowMo: config.slowMo,
+    executablePath: config.chromeExecutablePath || undefined,
+    artifactsPath: config.artifactDir,
+    args: [
+      '--disable-blink-features=AutomationControlled',
+      '--disable-dev-shm-usage',
+      '--disable-setuid-sandbox',
+      '--no-sandbox',
+      `--window-size=${BROWSER_VIEWPORT.width},${BROWSER_VIEWPORT.height}`,
+    ],
+  });
+}
+
+async function createBrowserContext(browser) {
+  const contextOptions = {
+    viewport: BROWSER_VIEWPORT,
+    screen: BROWSER_VIEWPORT,
+    deviceScaleFactor: 1,
+    hasTouch: false,
+    isMobile: false,
+    locale: 'en-US',
+    timezoneId: 'America/New_York',
+    userAgent: BROWSER_USER_AGENT,
+    extraHTTPHeaders: {
+      'Accept-Language': 'en-US,en;q=0.9',
+    },
+  };
+
+  try {
+    return await browser.newContext(contextOptions);
+  } catch (error) {
+    if (!config.browserWsEndpoint) throw error;
+    const context = browser.contexts()[0];
+    if (context) return context;
+    throw error;
+  }
 }
 
 async function login(page) {

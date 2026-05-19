@@ -16,6 +16,10 @@ services:
         value: false
       - key: PLAYWRIGHT_ARTIFACT_DIR
         value: /tmp/courtside-playwright
+      - key: PLAYWRIGHT_CONNECT_MODE
+        value: cdp
+      - key: PLAYWRIGHT_CONNECT_TIMEOUT_MS
+        value: 60000
       - key: WEBTRAC_CLEAR_CART_BEFORE_RESERVE
         value: true
       - key: ALLOW_WEBTRAC_FINAL_PAYMENT
@@ -25,6 +29,8 @@ services:
       - key: WEBTRAC_USERNAME
         sync: false
       - key: WEBTRAC_PASSWORD
+        sync: false
+      - key: PLAYWRIGHT_WS_ENDPOINT
         sync: false
       - key: WEBTRAC_BILL_FIRST_NAME
         sync: false
