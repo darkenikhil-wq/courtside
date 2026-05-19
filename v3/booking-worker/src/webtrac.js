@@ -203,7 +203,8 @@ export async function finalizeWebtracCheckout(options = {}) {
     let fillResult = { skipped: true, reason: 'no_card_entry_detected' };
     let paymentEntry = await inspectPaymentEntryPage(paymentPage);
 
-    const shouldPreparePaymentEntry = config.allowWebtracFinalPayment;
+    const shouldPreparePaymentEntry = config.allowWebtracFinalPayment
+      || (options.stopBeforeSubmit === true && options.verifyPaymentFields === true);
 
     if (checkoutState.needsPaymentMethod && !shouldPreparePaymentEntry) {
       selected = { selected: false, skipped: true, reason: 'final_payment_guard_disabled' };

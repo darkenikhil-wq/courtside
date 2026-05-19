@@ -29,6 +29,7 @@ exports.handler = async (event) => {
       body: JSON.stringify({
         booking: body.value.booking || null,
         stopBeforeSubmit: true,
+        verifyPaymentFields: body.value.verifyPaymentFields === true,
         requestedAt: Date.now(),
       }),
     });

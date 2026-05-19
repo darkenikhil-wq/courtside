@@ -41,7 +41,7 @@ app.get('/health', (req, res) => {
     allowWebtracFinalPayment: config.allowWebtracFinalPayment,
     paymentProfileConfigured: paymentMissing.length === 0,
     paymentMissingEnv: paymentMissing,
-    workerBuild: 'payment-readiness-health-v1',
+    workerBuild: 'verify-payment-fields-v1',
   });
 });
 
