@@ -2,8 +2,8 @@ import 'dotenv/config';
 
 const browserlessToken = process.env.BROWSERLESS_TOKEN || '';
 const browserlessRegion = process.env.BROWSERLESS_REGION || 'sfo';
-const browserlessStealth = process.env.BROWSERLESS_STEALTH !== 'false';
-const browserlessRoute = process.env.BROWSERLESS_ROUTE || (browserlessStealth ? 'stealth' : 'chrome');
+const browserlessStealth = process.env.BROWSERLESS_ALLOW_STEALTH === 'true' && process.env.BROWSERLESS_STEALTH === 'true';
+const browserlessRoute = browserlessStealth ? 'stealth' : 'chrome';
 const browserlessProxyEnabled = process.env.BROWSERLESS_PROXY_ENABLED === 'true';
 const browserlessProxy = process.env.BROWSERLESS_PROXY || '';
 const browserlessProxyCountry = process.env.BROWSERLESS_PROXY_COUNTRY || '';

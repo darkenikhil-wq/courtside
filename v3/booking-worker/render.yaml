@@ -44,6 +44,8 @@ services:
         value: sfo
       - key: BROWSERLESS_ROUTE
         value: chrome
+      - key: BROWSERLESS_ALLOW_STEALTH
+        value: false
       - key: BROWSERLESS_STEALTH
         value: false
       - key: BROWSERLESS_PROXY_ENABLED
