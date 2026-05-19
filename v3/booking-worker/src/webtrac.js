@@ -341,10 +341,32 @@ async function resetArtifactDir() {
 
 async function login(page) {
   let lastUrl = null;
+  const attempts = [];
   for (const path of LOGIN_CANDIDATES) {
     lastUrl = WEBTRAC_ORIGIN + path;
     await page.goto(lastUrl, { waitUntil: 'domcontentloaded', timeout: 45000 }).catch(() => {});
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
+    const bodyText = await page.locator('body').innerText({ timeout: 5000 }).catch(() => '');
+    const title = await page.title().catch(() => '');
+    const loginAttempt = {
+      requestedUrl: lastUrl,
+      landedUrl: page.url(),
+      title,
+      authState: authStateFromText(bodyText),
+      cloudflareBlocked: isCloudflareBlocked(bodyText, title),
+      snippet: bodyText.replace(/\s+/g, ' ').slice(0, 360),
+    };
+    attempts.push(loginAttempt);
+
+    if (loginAttempt.authState === 'signed_in') return;
+    if (loginAttempt.cloudflareBlocked) {
+      throw codedError(
+        'WEBTRAC_ACCESS_BLOCKED',
+        'WebTrac/Cloudflare blocked this worker environment before the login form loaded.',
+        { loginAttempts: attempts }
+      );
+    }
 
     const username = firstVisible(page, [
       'input[name="username"]',
@@ -375,7 +397,11 @@ async function login(page) {
     }
   }
 
-  throw codedError('LOGIN_FORM_NOT_FOUND', `Could not find a WebTrac login form. Last attempted: ${lastUrl}`);
+  throw codedError(
+    'LOGIN_FORM_NOT_FOUND',
+    `Could not find a WebTrac login form. Last attempted: ${lastUrl}`,
+    { loginAttempts: attempts }
+  );
 }
 
 function firstVisible(page, selectors) {
@@ -1399,6 +1425,11 @@ function authStateFromText(bodyText) {
   return 'unknown';
 }
 
+function isCloudflareBlocked(bodyText, title = '') {
+  const text = `${title} ${bodyText}`;
+  return /attention required|sorry,\s*you have been blocked|cloudflare|cf-error-details/i.test(text);
+}
+
 async function callUpdateSelection(page, selectionUrl) {
   const absoluteUrl = new URL(selectionUrl, WEBTRAC_ORIGIN).toString();
   const result = await page.evaluate(async (url) => {
@@ -1779,8 +1810,9 @@ function hhmmToMins(hhmm) {
   return Number(match[1]) * 60 + Number(match[2]);
 }
 
-function codedError(code, message) {
+function codedError(code, message, details = null) {
   const err = new Error(message);
   err.code = code;
+  if (details) err.details = details;
   return err;
 }

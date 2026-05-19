@@ -63,6 +63,7 @@ app.post('/reserve', async (req, res) => {
       code: e.code || 'WEBTRAC_WORKER_ERROR',
       message: e.message || String(e),
       missing: e.missing,
+      details: e.details,
     });
   }
 });
@@ -97,6 +98,7 @@ app.post('/checkout/inspect', async (req, res) => {
       code: e.code || 'WEBTRAC_CHECKOUT_INSPECTION_ERROR',
       message: e.message || String(e),
       missing: e.missing,
+      details: e.details,
     });
   }
 });
@@ -133,6 +135,7 @@ app.post('/checkout/finalize', async (req, res) => {
       code: e.code || 'WEBTRAC_FINALIZE_ERROR',
       message: e.message || String(e),
       missing: e.missing,
+      details: e.details,
     });
   }
 });
