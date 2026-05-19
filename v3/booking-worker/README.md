@@ -69,7 +69,8 @@ npm run smoke
 
 After a court is in the WebTrac cart, inspect the remaining checkout path
 without entering or submitting payment. This opens the payment-method selector
-only far enough to report the available choices:
+only far enough to report the available choices, chooses `Credit Card - Web`,
+and stops on the card-entry screen:
 
 ```bash
 npm run inspect:checkout

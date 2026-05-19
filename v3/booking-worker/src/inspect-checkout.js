@@ -26,6 +26,7 @@ console.log(JSON.stringify({
     markers: step.markers,
     controls: step.controls,
     paymentMethodProbe: step.paymentMethodProbe,
+    paymentEntryProbe: step.paymentEntryProbe,
     nextAction: step.nextAction,
   })),
 }, null, 2));

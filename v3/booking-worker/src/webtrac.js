@@ -119,6 +119,7 @@ export async function inspectCheckoutFlow(options = {}) {
       if (snapshot.stopReason) {
         if (snapshot.stopReason === 'payment_page') {
           snapshot.paymentMethodProbe = await inspectPaymentMethodSelector(page);
+          snapshot.paymentEntryProbe = await inspectCreditCardEntryStep(page);
         }
         return {
           status: 'checkout_inspected',
@@ -500,15 +501,234 @@ async function visiblePaymentMethodOptions(page) {
         value: String(el.value || '').slice(0, 80),
         label: labelFor(el).slice(0, 220),
       }))
-      .filter((item) => /payment|credit|card|visa|mastercard|amex|american express|discover|e-?check|bank|account|new|saved|cash|pay later|refund|household|balance/i.test(`${item.label} ${item.name} ${item.id} ${item.value}`))
+      .map((item) => {
+        const text = `${item.label} ${item.name} ${item.id} ${item.value}`;
+        const method = text.match(/Credit Card - Web|eCheck|Saved Card|New Credit Card|Credit Card|Bank Account/i)?.[0] || '';
+        return method ? { ...item, method } : null;
+      })
+      .filter(Boolean)
       .filter((item) => {
-        const key = `${item.tag}|${item.type}|${item.id}|${item.name}|${item.value}|${item.label}`;
+        const key = `${item.method}|${item.tag}|${item.id}|${item.name}|${item.value}`;
         if (seen.has(key)) return false;
         seen.add(key);
         return true;
       })
       .slice(0, 40);
   });
+}
+
+async function inspectCreditCardEntryStep(page) {
+  const selected = await selectPaymentMethodOption(page, /Credit Card - Web/i);
+  if (!selected.selected) {
+    return {
+      selected,
+      continued: { clicked: false, reason: 'credit_card_web_option_not_found' },
+      entryPage: null,
+    };
+  }
+
+  const continued = await clickCheckoutContinueButton(page);
+  if (!continued.clicked) {
+    return { selected, continued, entryPage: null };
+  }
+
+  const activePage = continued.page || page;
+  return {
+    selected,
+    continued: withoutPageHandle(continued),
+    entryPage: await inspectPaymentEntryPage(activePage),
+  };
+}
+
+async function selectPaymentMethodOption(page, pattern) {
+  let result = await clickVisiblePaymentMethodOption(page, pattern);
+  if (result.selected) return result;
+
+  await inspectPaymentMethodSelector(page);
+  result = await clickVisiblePaymentMethodOption(page, pattern);
+  return result;
+}
+
+async function clickVisiblePaymentMethodOption(page, pattern) {
+  const patternSource = pattern.source;
+  return page.evaluate((source) => {
+    const re = new RegExp(source, 'i');
+
+    function visible(el) {
+      const style = window.getComputedStyle(el);
+      const rect = el.getBoundingClientRect();
+      return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0;
+    }
+
+    function labelFor(el) {
+      return [
+        el.innerText,
+        el.textContent,
+        el.value,
+        el.getAttribute('aria-label'),
+        el.getAttribute('title'),
+      ].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+    }
+
+    const candidates = [
+      ...Array.from(document.querySelectorAll('select option')).filter((el) => !el.disabled),
+      ...Array.from(document.querySelectorAll('[role="option"], [role="menuitem"], li, a, button, input[type="radio"]')),
+    ];
+
+    for (const el of candidates) {
+      if (!visible(el)) continue;
+      const label = labelFor(el);
+      if (!re.test(label)) continue;
+
+      if (el.tagName === 'OPTION') {
+        const select = el.closest('select');
+        if (!select) continue;
+        select.value = el.value;
+        select.dispatchEvent(new Event('input', { bubbles: true }));
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+      } else if (el.tagName === 'INPUT') {
+        el.checked = true;
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+      } else {
+        el.click();
+      }
+
+      return {
+        selected: true,
+        label: label.match(/Credit Card - Web|eCheck|Saved Card|New Credit Card|Credit Card|Bank Account/i)?.[0] || label.slice(0, 120),
+        tag: el.tagName.toLowerCase(),
+        id: el.getAttribute('id') || '',
+        name: el.getAttribute('name') || '',
+      };
+    }
+
+    return { selected: false, reason: 'matching_payment_option_not_visible' };
+  }, patternSource);
+}
+
+async function clickCheckoutContinueButton(page) {
+  const locator = page.locator('#webcheckout_buttoncontinue').filter({ visible: true });
+  if (!await locator.count().catch(() => 0)) {
+    return { clicked: false, reason: 'checkout_continue_not_found' };
+  }
+
+  const popupPromise = page.context().waitForEvent('page', { timeout: 8000 }).catch(() => null);
+  await Promise.all([
+    page.waitForLoadState('domcontentloaded', { timeout: 15000 }).catch(() => {}),
+    locator.first().click(),
+  ]);
+  const popup = await popupPromise;
+  const activePage = popup || page;
+  await activePage.waitForLoadState('domcontentloaded', { timeout: 15000 }).catch(() => {});
+  await activePage.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+
+  return {
+    clicked: true,
+    selector: '#webcheckout_buttoncontinue',
+    label: 'Continue',
+    url: activePage.url(),
+    openedNewPage: Boolean(popup),
+    page: activePage,
+  };
+}
+
+function withoutPageHandle(result) {
+  const { page, ...json } = result;
+  return json;
+}
+
+async function inspectPaymentEntryPage(page) {
+  const frames = [];
+  for (const frame of page.frames()) {
+    frames.push({
+      url: frame.url(),
+      name: frame.name(),
+      details: await inspectPaymentFrame(frame),
+    });
+  }
+
+  const combinedText = frames.map((frame) => [
+    frame.url,
+    frame.details.textSnippet,
+    ...frame.details.fields.map((field) => `${field.label} ${field.name} ${field.id} ${field.placeholder} ${field.autocomplete}`),
+    ...frame.details.controls.map((control) => control.label),
+  ].join(' ')).join(' ');
+
+  return {
+    url: page.url(),
+    title: await page.title().catch(() => ''),
+    markers: {
+      hasCardField: /card\s*number|cc-?number|cardnumber|credit\s*card/i.test(combinedText),
+      hasExpirationField: /expir|expiry|cc-exp|expmonth|expyear/i.test(combinedText),
+      hasSecurityCodeField: /security\s*code|cvv|cvc|cid|cc-csc/i.test(combinedText),
+      hasSubmitPaymentAction: /submit\s+payment|make\s+payment|process\s+payment|complete\s+(order|transaction)|place\s+order|purchase/i.test(combinedText),
+    },
+    frames,
+  };
+}
+
+async function inspectPaymentFrame(frame) {
+  return frame.evaluate(() => {
+    function visible(el) {
+      const style = window.getComputedStyle(el);
+      const rect = el.getBoundingClientRect();
+      return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0;
+    }
+
+    function labelFor(el) {
+      const id = el.getAttribute('id');
+      return [
+        el.getAttribute('aria-label'),
+        el.getAttribute('placeholder'),
+        id ? document.querySelector(`label[for="${CSS.escape(id)}"]`)?.textContent : '',
+        el.closest('label, tr, li, .form-group, .field, div')?.textContent,
+      ].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim().slice(0, 160);
+    }
+
+    const fields = Array.from(document.querySelectorAll('input, select, textarea'))
+      .filter(visible)
+      .map((el) => ({
+        tag: el.tagName.toLowerCase(),
+        type: el.getAttribute('type') || '',
+        id: el.getAttribute('id') || '',
+        name: el.getAttribute('name') || '',
+        autocomplete: el.getAttribute('autocomplete') || '',
+        placeholder: el.getAttribute('placeholder') || '',
+        label: labelFor(el),
+      }))
+      .filter((field) => /card|credit|cc-|expir|expiry|cvv|cvc|cid|security|name|address|zip|postal|email|phone/i.test(`${field.label} ${field.name} ${field.id} ${field.autocomplete} ${field.placeholder}`))
+      .slice(0, 40);
+
+    const controls = Array.from(document.querySelectorAll('button, input[type="submit"], input[type="button"], a'))
+      .filter(visible)
+      .map((el) => ({
+        tag: el.tagName.toLowerCase(),
+        type: el.getAttribute('type') || '',
+        id: el.getAttribute('id') || '',
+        name: el.getAttribute('name') || '',
+        label: [
+          el.innerText,
+          el.value,
+          el.getAttribute('aria-label'),
+          el.getAttribute('title'),
+        ].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim().slice(0, 160),
+      }))
+      .filter((control) => /continue|next|submit|payment|pay|complete|place order|purchase|cancel|back/i.test(`${control.label} ${control.name} ${control.id}`))
+      .slice(0, 30);
+
+    return {
+      title: document.title,
+      textSnippet: document.body ? document.body.innerText.replace(/\s+/g, ' ').trim().slice(0, 500) : '',
+      fields,
+      controls,
+    };
+  }).catch((e) => ({
+    error: e.message || String(e),
+    textSnippet: '',
+    fields: [],
+    controls: [],
+  }));
 }
 
 async function clickCheckoutInspectionNext(page) {
