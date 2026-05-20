@@ -948,6 +948,35 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       line-height: 1.45;
       text-align: left;
     }
+    .court-filter {
+      display: grid;
+      gap: 7px;
+      margin: 0 0 12px;
+      text-align: left;
+    }
+    .court-filter span {
+      font-size: 11px;
+      font-weight: 650;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .court-filter input {
+      min-height: 44px;
+      width: 100%;
+      border-radius: 10px;
+      border: 1.5px solid var(--line);
+      background: var(--card);
+      color: var(--ink);
+      padding: 0 12px;
+      font: inherit;
+      font-size: 15px;
+      outline: none;
+    }
+    .court-filter input:focus {
+      border-color: rgba(var(--accent-rgb), 0.62);
+      box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.10);
+    }
     .result-list {
       display: grid;
       gap: 10px;
@@ -1025,6 +1054,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       margin-bottom: 0;
     }
     .results-toolbar .btn { margin-bottom: 0; }
+    .empty-results {
+      margin: 12px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+      text-align: left;
+    }
+    .empty-results[hidden] { display: none; }
     .error {
       color: var(--error);
       background: rgba(220, 38, 38, 0.08);
@@ -1239,7 +1276,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       { id: 'langston-brown',     name: 'Langston-Brown Community Center',       lat: 38.8959705, lng: -77.1266741, code: 'LANGS', sports: ['tennis'] },
       { id: 'lyon-village',       name: 'Lyon Village Park',                     lat: 38.8937180, lng: -77.0947330, code: 'LYON',  sports: ['tennis'] },
       { id: 'madison-manor',      name: 'Madison Manor Park',                    lat: 38.8825550, lng: -77.1498390, code: 'MADM',  sports: ['tennis'] },
-      { id: 'marcey-road',        name: 'Marcey Road Park',                      lat: 38.9107050, lng: -77.1096010, code: 'MARCY', sports: ['tennis', 'pickleball'] },
+      { id: 'marcey-road',        name: 'Marcey Road Park',                      lat: 38.9108386, lng: -77.1095795, code: 'MARCY', sports: ['tennis', 'pickleball'] },
       { id: 'maury',              name: 'Maury Park',                            lat: 38.8819386, lng: -77.1024012, code: 'MAURY', sports: ['tennis'] },
       { id: 'quincy',             name: 'Quincy Park',                           lat: 38.8856109, lng: -77.1079805, code: 'QUINC', sports: ['tennis', 'volleyball'] },
       { id: 'stratford',          name: 'Stratford Park',                        lat: 38.8997830, lng: -77.1136080, code: 'STRAT', sports: ['tennis'] },
@@ -3865,28 +3902,64 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       return Array.from(resultStates.values()).sort((a, b) => a.index - b.index);
     }
 
+    function normalizeCourtSearch(value) {
+      return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    }
+
+    function courtMatchesSearch(court, query) {
+      const q = normalizeCourtSearch(query);
+      if (!q) return true;
+      const haystack = normalizeCourtSearch([
+        court.name,
+        court.id,
+        court.code,
+        (court.name || '').replace(/\b(park|community|center|middle|school|road)\b/ig, ''),
+      ].join(' '));
+      return q.split(/\s+/).every(part => haystack.includes(part));
+    }
+
+    function matchingResultStates(resultStates) {
+      const query = resultStates && resultStates.query || '';
+      return orderedResultStates(resultStates).filter(state => courtMatchesSearch(state.court, query));
+    }
+
     function visibleResultStates(resultStates) {
-      return orderedResultStates(resultStates).slice(0, resultStates.visibleLimit || RESULT_BATCH_SIZE);
+      return matchingResultStates(resultStates).slice(0, resultStates.visibleLimit || RESULT_BATCH_SIZE);
     }
 
     function syncResultCards(resultStates) {
       const list = card.querySelector('.result-list');
       if (!list || !resultStates) return;
       const orderedStates = orderedResultStates(resultStates);
+      const matchingStates = matchingResultStates(resultStates);
+      const visibleStates = matchingStates.slice(0, resultStates.visibleLimit || RESULT_BATCH_SIZE);
+      const visibleIds = new Set(visibleStates.map(state => state.court.id));
+      const matchingIds = new Set(matchingStates.map(state => state.court.id));
 
-      orderedStates.forEach((state, index) => {
+      matchingStates.forEach((state, index) => {
         const node = list.querySelector(`[data-result-court-id="${state.court.id}"]`);
         if (!node) return;
         node.hidden = index >= (resultStates.visibleLimit || RESULT_BATCH_SIZE);
         list.appendChild(node);
       });
+      orderedStates.forEach((state) => {
+        if (matchingIds.has(state.court.id)) return;
+        const node = list.querySelector(`[data-result-court-id="${state.court.id}"]`);
+        if (!node) return;
+        node.hidden = true;
+        list.appendChild(node);
+      });
 
       const showMoreBtn = document.getElementById('showMoreResultsBtn');
-      if (!showMoreBtn) return;
-      const hiddenCount = Math.max(0, orderedStates.length - (resultStates.visibleLimit || RESULT_BATCH_SIZE));
-      const nextCount = Math.min(RESULT_BATCH_SIZE, hiddenCount);
-      showMoreBtn.hidden = hiddenCount === 0;
-      showMoreBtn.textContent = `Show ${nextCount} more court${nextCount === 1 ? '' : 's'}`;
+      if (showMoreBtn) {
+        const hiddenCount = Math.max(0, matchingStates.length - (resultStates.visibleLimit || RESULT_BATCH_SIZE));
+        const nextCount = Math.min(RESULT_BATCH_SIZE, hiddenCount);
+        showMoreBtn.hidden = hiddenCount === 0;
+        showMoreBtn.textContent = `Show ${nextCount} more court${nextCount === 1 ? '' : 's'}`;
+      }
+
+      const emptyEl = document.getElementById('emptyResults');
+      if (emptyEl) emptyEl.hidden = visibleIds.size > 0;
     }
 
     function resultCardHtml(court, nearby, summary = initialResultSummaryForCourt(court)) {
@@ -3968,9 +4041,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         <h1>${title}</h1>
         <div class="search-summary">${summary}</div>
         ${errMsg ? `<div class="error">${errMsg}</div>` : ''}
+        <label class="court-filter" for="courtFilterInput">
+          <span>Find a court</span>
+          <input id="courtFilterInput" type="search" autocomplete="off" placeholder="Search by park name">
+        </label>
         <div class="result-list">
           ${courts.map(c => resultCardHtml(c, nearby, resultStates.get(c.id).summary)).join('')}
         </div>
+        <div class="empty-results" id="emptyResults" hidden>No courts match that search.</div>
         <button class="btn btn-secondary show-more-results" id="showMoreResultsBtn" type="button" hidden>Show more courts</button>
         <div class="results-toolbar">
           <button class="btn btn-secondary" id="changeTimeBtn" type="button">Change time</button>
@@ -3991,6 +4069,18 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             source: nearby ? 'nearby-availability' : 'manual-selection',
           });
           renderPostBooking(court, userLoc, { lockedWhen: true });
+        });
+      });
+
+      document.getElementById('courtFilterInput')?.addEventListener('input', (event) => {
+        resultStates.query = event.target.value || '';
+        resultStates.visibleLimit = RESULT_BATCH_SIZE;
+        syncResultCards(resultStates);
+        loadVisibleCourtSearchAvailability(nearby, runId, resultStates);
+        track('court_results_filtered', {
+          sport: selectedSport,
+          source: nearby ? 'nearby-availability' : 'manual-selection',
+          hasQuery: normalizeCourtSearch(resultStates.query).length > 0,
         });
       });
 
