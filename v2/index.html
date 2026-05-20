@@ -513,9 +513,68 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       min-height: 1em;
       text-align: left;
     }
+    .avail-status.avail-ok  { color: var(--accent); font-weight: 600; }
+    .avail-status.avail-bad { color: var(--error);  font-weight: 600; }
     /* Disabled options in the time <select> get a softer color so unavailable
        slots read as "you can't pick this" not "I'm broken". */
     .when-input option:disabled { color: var(--muted); }
+
+    /* v2: compact "your slot" summary shown on the court-confirm screen */
+    .when-summary {
+      margin: 16px 0 14px;
+      padding: 14px 16px;
+      background: var(--card-elev);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      text-align: left;
+    }
+    .when-summary-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .when-summary-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 3px;
+    }
+    .when-summary-text {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--ink);
+    }
+    .when-edit {
+      flex-shrink: 0;
+      background: none;
+      border: 1px solid var(--line);
+      color: var(--accent);
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 8px 14px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .when-edit:hover { border-color: rgba(var(--accent-rgb), 0.50); background: rgba(var(--accent-rgb), 0.06); }
+
+    /* v2: availability badge on court-list rows */
+    .avail-badge {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+    .avail-badge--checking { color: var(--muted); background: rgba(255, 255, 255, 0.06); }
+    .avail-badge--open     { color: var(--accent); background: rgba(var(--accent-rgb), 0.12); }
+    .avail-badge--taken    { color: var(--error);  background: rgba(248, 113, 113, 0.12); }
 
     /* Modules — used on the Work with us page (and reusable for other multi-section pages) */
     .module {
@@ -1098,72 +1157,55 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       toastTimer = setTimeout(() => el.classList.remove('show'), 1800);
     }
 
-    // Auto-route ("user is at the court") thresholds.
-    // Phone GPS error is routinely 20–50m (and worse under tree cover / urban),
-    // so a strict 0.1mi cutoff was too tight — a user literally on a court can
-    // read >0.1mi away. We auto-route if EITHER:
-    //   - nearest court is within AT_COURT_THRESHOLD_MI (absolute distance), OR
-    //   - "dominantly nearest" AND still reasonably close:
-    //       nearest.dist <= DOMINANT_NEAREST_MAX_MI
-    //       AND nearest.dist < second.dist * DOMINANT_NEAREST_RATIO
-    //
-    // The MAX_MI cap is critical: without it, a user 5mi from any court would
-    // get auto-routed to whichever single court is 5x closer than the next one.
-    // Far-away users must always land on the court-list fallback.
-    //
-    // Single-court case (some sports have only a few): use withinAbsolute only.
-    // Do NOT auto-route to a single court that's far away.
-    const AT_COURT_THRESHOLD_MI   = 0.25;
-    const DOMINANT_NEAREST_MAX_MI = 0.5;
-    const DOMINANT_NEAREST_RATIO  = 0.6;
+    // Auto-route shortcut: if GPS says the user is basically standing on a
+    // court (within this radius), skip the list and go straight to that court's
+    // confirm screen. Otherwise we always show the closest-courts list.
+    const AT_COURT_THRESHOLD_MI = 0.25;
 
     // ==================== v2: Booking preferences ====================
     // User-selected date / time / duration drive the WebTrac deep-link.
     //   date     'YYYY-MM-DD'   (native <input type="date">)
-    //   time     'HH:MM' 24h    (custom <select>, 30-min slots in operating hours)
+    //   time     'HH:MM' 24h    (<select>, 30-min slots in operating hours)
     //   duration 60 | 90 mins   (segmented toggle)
-    // Duration is informational; WebTrac doesn't take it as a URL param, so we
-    // use it to pick how many slot blocks the WebTrac results page shows.
-    const BOOKING_MIN_DAYS_AHEAD = 1;   // WebTrac ≥1 day advance
-    const BOOKING_MAX_DAYS_AHEAD = 14;  // …and ≤14 days
+    //
+    // Arlington booking rules enforced here:
+    //   - reservations must be AT LEAST 24 hours in advance
+    //   - reservations must be NO MORE than 14 days out
+    // The 24h cutoff is a rolling window measured from the user's actual visit
+    // time, so both the selectable dates AND the selectable times shift through
+    // the day. (e.g. visiting at 3pm, the 9am slot tomorrow is only 18h away
+    // and is therefore hidden.)
+    const BOOKING_MAX_DAYS_AHEAD = 14;                  // Arlington: ≤ 14 days out
+    const BOOKING_MIN_LEAD_MS    = 24 * 60 * 60 * 1000; // Arlington: ≥ 24h ahead
+
+    // WebTrac slot grid: 30-min increments, operating ~7am to ~9:30pm.
+    const BOOKING_FIRST_HOUR = 7;   // 07:00 first start
+    const BOOKING_LAST_HOUR  = 21;  // 21:30 last start (inclusive)
 
     const bookingPrefs = { date: null, time: null, duration: 60 };
 
-    function defaultBookingDateISO() {
+    // ---- Date / time helpers ----
+    // ISO 'YYYY-MM-DD' for today + N days. Anchored at noon so DST / UTC offset
+    // can never roll the calendar date over.
+    function isoForDayOffset(days) {
       const d = new Date();
-      d.setDate(d.getDate() + BOOKING_MIN_DAYS_AHEAD);
-      return d.toISOString().slice(0, 10);
+      d.setHours(12, 0, 0, 0);
+      d.setDate(d.getDate() + days);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     }
-    function maxBookingDateISO() {
-      const d = new Date();
-      d.setDate(d.getDate() + BOOKING_MAX_DAYS_AHEAD);
-      return d.toISOString().slice(0, 10);
-    }
-    // WebTrac slot grid: 30-min increments, operating ~7am to ~9:30pm.
-    // Match that exactly so users can't pick a time WebTrac won't accept.
-    const BOOKING_FIRST_HOUR = 7;   // 07:00
-    const BOOKING_LAST_HOUR  = 21;  // 21:30 inclusive
+    function maxBookingDateISO() { return isoForDayOffset(BOOKING_MAX_DAYS_AHEAD); }
 
-    function defaultBookingTime24() {
-      // Round current time up to next 30-min increment, then clamp into the
-      // operating window so the default is always a real WebTrac slot.
-      const d = new Date();
-      const m = d.getMinutes();
-      if (m !== 0) {
-        if (m <= 30) d.setMinutes(30, 0, 0);
-        else { d.setMinutes(0, 0, 0); d.setHours(d.getHours() + 1); }
-      }
-      let h = d.getHours();
-      let min = d.getMinutes();
-      if (h < BOOKING_FIRST_HOUR) { h = BOOKING_FIRST_HOUR; min = 0; }
-      if (h > BOOKING_LAST_HOUR || (h === BOOKING_LAST_HOUR && min > 30)) {
-        h = BOOKING_LAST_HOUR; min = 30;
-      }
-      return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
+    // Local Date object for a given 'YYYY-MM-DD' + 'HH:MM'.
+    function dateTimeToLocal(iso, hhmm) {
+      const [y, m, d] = iso.split('-').map(Number);
+      const [h, min]  = hhmm.split(':').map(Number);
+      return new Date(y, m - 1, d, h, min, 0, 0);
     }
+    // The earliest bookable instant — right now + 24h.
+    function earliestBookableTime() { return Date.now() + BOOKING_MIN_LEAD_MS; }
 
-    // Returns array of { value: 'HH:MM', label: '7:00 AM' } for every valid slot.
-    function listBookingTimes() {
+    // Every operating-hours start time as { value:'HH:MM', label:'7:00 AM' }.
+    function allOperatingTimes() {
       const out = [];
       for (let h = BOOKING_FIRST_HOUR; h <= BOOKING_LAST_HOUR; h++) {
         for (const m of [0, 30]) {
@@ -1175,11 +1217,43 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }
       return out;
     }
-    function initBookingPrefsIfNeeded() {
-      if (!bookingPrefs.date) bookingPrefs.date = defaultBookingDateISO();
-      if (!bookingPrefs.time) bookingPrefs.time = defaultBookingTime24();
+    // Valid start times for a date: an operating slot counts only if it begins
+    // at or after now + 24h. On later dates every slot passes the test.
+    function validBookingTimesForDate(iso) {
+      const cutoff = earliestBookableTime();
+      return allOperatingTimes().filter(t => dateTimeToLocal(iso, t.value).getTime() >= cutoff);
+    }
+    // First date inside the 1–14 day window that still has a valid time slot.
+    // Usually tomorrow; rolls forward late at night when all of tomorrow's
+    // remaining slots fall inside the 24h cutoff.
+    function earliestValidDateISO() {
+      for (let days = 1; days <= BOOKING_MAX_DAYS_AHEAD; days++) {
+        const iso = isoForDayOffset(days);
+        if (validBookingTimesForDate(iso).length) return iso;
+      }
+      return isoForDayOffset(1);
+    }
+    function labelForTime(hhmm) {
+      const t = allOperatingTimes().find(x => x.value === hhmm);
+      return t ? t.label : hhmm;
     }
 
+    // Re-validate prefs on every read: a stale date/time (tab left open past
+    // the 24h cutoff) is corrected forward automatically.
+    function initBookingPrefsIfNeeded() {
+      const minDate = earliestValidDateISO();
+      const maxDate = maxBookingDateISO();
+      if (!bookingPrefs.date || bookingPrefs.date < minDate || bookingPrefs.date > maxDate) {
+        bookingPrefs.date = minDate;
+      }
+      const valid = validBookingTimesForDate(bookingPrefs.date);
+      if (!bookingPrefs.time || !valid.some(t => t.value === bookingPrefs.time)) {
+        bookingPrefs.time = valid.length ? valid[0].value : '08:00';
+      }
+      if (bookingPrefs.duration !== 90) bookingPrefs.duration = 60;
+    }
+
+    // ---- WebTrac formatting ----
     function isoToWebtracDate(iso) {
       const [y, m, d] = iso.split('-');
       return `${m}/${d}/${y}`;
@@ -1190,41 +1264,47 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const h12 = h % 12 === 0 ? 12 : h % 12;
       return `${String(h12).padStart(2, '0')}:${String(m).padStart(2, '0')} ${ampm}`;
     }
-    function durationToBlocks(duration) {
-      return duration === 90 ? '6' : '4';
+    // 30-min blocks needed to cover the chosen duration (60 -> 2, 90 -> 3).
+    function durationBlocks(duration) {
+      return Math.max(1, Math.round((duration || 60) / 30));
     }
 
     function bookingDate() {
       initBookingPrefsIfNeeded();
       return isoToWebtracDate(bookingPrefs.date);
     }
-    // WebTrac display window: ALWAYS 8am–9pm so the user lands on a familiar
-    // full-day grid where they can click adjacent slots to extend if needed.
-    // The user's picked time is still passed to WebTrac, but via the slot's
-    // direct cart-add URL (GlobalSalesArea_FRItemBeginTime), not via the
-    // search-display begintime.
-    const WEBTRAC_DISPLAY_BEGIN_TIME = '08:00 am';
-    const WEBTRAC_DISPLAY_BLOCKS     = '26';      // 8am → 9pm in 30-min blocks
+    // Deep-link grid: start the WebTrac results grid AT the user's chosen time
+    // and show only enough 30-min rows to cover their duration — so the slot
+    // they picked is the one slot on screen to pick a court for and add to cart.
+    function bookingBeginTime()       { initBookingPrefsIfNeeded(); return time24toWebtracTime(bookingPrefs.time); }
+    function bookingBlocksToDisplay() { initBookingPrefsIfNeeded(); return String(durationBlocks(bookingPrefs.duration)); }
 
-    function bookingBeginTime()       { return WEBTRAC_DISPLAY_BEGIN_TIME; }
-    function bookingBlocksToDisplay() { return WEBTRAC_DISPLAY_BLOCKS; }
+    // Human-readable summary, e.g. "Wed, May 21 · 5:00 PM · 60 min".
+    function bookingWhenSummary() {
+      initBookingPrefsIfNeeded();
+      const [y, m, d] = bookingPrefs.date.split('-').map(Number);
+      const day = new Date(y, m - 1, d)
+        .toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+      return `${day} · ${labelForTime(bookingPrefs.time)} · ${bookingPrefs.duration} min`;
+    }
 
-    // When the user picks a specific time AND we have its live cart-add URL,
-    // combine: slot adds to cart + search params render the full 8am–9pm grid
-    // around it (so they can extend the booking with adjacent slot clicks if
-    // they want 60 or 90 min).
-    function buildCartAddUrl(slotBookingUrl, court) {
-      const url = new URL(slotBookingUrl, 'https://vaarlingtonweb.myvscloud.com/');
-      url.searchParams.set('type', SPORTS[selectedSport].type);
-      url.searchParams.set('location', court.code);
-      url.searchParams.set('date', bookingDate());
-      url.searchParams.set('begintime', WEBTRAC_DISPLAY_BEGIN_TIME);
-      url.searchParams.set('blockstodisplay', WEBTRAC_DISPLAY_BLOCKS);
-      url.searchParams.set('display', 'Detail');
-      url.searchParams.set('search', 'yes');
-      url.searchParams.set('module', 'FR');
-      url.searchParams.set('frheadcount', '0');
-      return url.toString();
+    // ---- Availability evaluation ----
+    // Does this slot list cover the chosen start for the full duration?
+    // A 60-min booking needs 2 consecutive available 30-min blocks; 90 -> 3.
+    // Returns true (open) / false (taken) / null (unknown — not in the grid).
+    function slotsCoverBooking(slots, startHHMM, duration) {
+      if (!Array.isArray(slots) || !slots.length) return null;
+      const lookup = new Map(slots.map(s => [s.start, s]));
+      const [h, m] = startHHMM.split(':').map(Number);
+      let mins = h * 60 + m;
+      for (let i = 0; i < durationBlocks(duration); i++) {
+        const key = `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`;
+        const info = lookup.get(key);
+        if (!info) return null;
+        if (info.available === false) return false;
+        mins += 30;
+      }
+      return true;
     }
 
     // -------------------- Availability (live slot data via Netlify Function) --------------------
@@ -1294,77 +1374,37 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }
     }
 
-    // Apply availability data to the live #prefTime <select>. Disabled options
-    // get a " — Unavailable" suffix and grey out (browser default for :disabled).
-    // Available options stash their bookingUrl in dataset so the Open button
-    // can deep-link the user straight into "slot in cart" on WebTrac.
-    function applyAvailabilityToTimeSelect(slots, statusEl) {
-      const select = document.getElementById('prefTime');
-      if (!select) return;
-      const lookup = new Map((slots || []).map(s => [s.start, s]));
-      Array.from(select.options).forEach(opt => {
-        const baseLabel = opt.dataset.baseLabel || opt.text.replace(/ — Unavailable$/, '');
-        opt.dataset.baseLabel = baseLabel;
-        const info = lookup.get(opt.value);
-        if (info && info.available === false) {
-          opt.disabled = true;
-          opt.text = baseLabel + ' — Unavailable';
-          delete opt.dataset.bookingUrl;
-        } else {
-          opt.disabled = false;
-          opt.text = baseLabel;
-          if (info && info.bookingUrl) opt.dataset.bookingUrl = info.bookingUrl;
-          else delete opt.dataset.bookingUrl;
-        }
-      });
-      if (select.options[select.selectedIndex] && select.options[select.selectedIndex].disabled) {
-        const next = Array.from(select.options).find(o => !o.disabled);
-        if (next) {
-          select.value = next.value;
-          bookingPrefs.time = next.value;
-        }
-      }
-      if (statusEl) statusEl.textContent = '';
+    // Check whether ONE court has the user's chosen slot open for the full
+    // duration. Returns 'open' | 'taken' | 'unknown'.
+    async function checkCourtSlot(court) {
+      if (!court || !court.code || court.code === 'TBD') return 'unknown';
+      const result = await fetchAvailability(court.code, SPORTS[selectedSport].type);
+      if (result && result.__error) return 'unknown';
+      const covered = slotsCoverBooking(result, bookingPrefs.time, bookingPrefs.duration);
+      if (covered === true)  return 'open';
+      if (covered === false) return 'taken';
+      return 'unknown';
     }
 
-    function clearAvailabilityFromTimeSelect() {
-      const select = document.getElementById('prefTime');
-      if (!select) return;
-      Array.from(select.options).forEach(opt => {
-        opt.disabled = false;
-        if (opt.dataset.baseLabel) opt.text = opt.dataset.baseLabel;
-        delete opt.dataset.bookingUrl;
-      });
-    }
-
-    // Look up the live booking URL for whatever time is currently selected.
-    // Returns null if availability data hasn't loaded yet or the slot has no URL
-    // (in which case the caller falls back to the generic search URL).
-    function selectedSlotBookingUrl() {
-      const select = document.getElementById('prefTime');
-      if (!select) return null;
-      const opt = select.options[select.selectedIndex];
-      return opt && opt.dataset.bookingUrl ? opt.dataset.bookingUrl : null;
-    }
-
+    // Fill a status element on the court-confirm screen with the live result
+    // of the chosen slot for that court.
     async function refreshAvailability(court, statusEl) {
-      if (!court || !court.code || court.code === 'TBD') return;
-      const sportType = SPORTS[selectedSport].type;
-      if (statusEl) statusEl.textContent = 'Checking availability…';
-      const result = await fetchAvailability(court.code, sportType);
-      if (result && result.__error) {
-        // Specific error message so you know WHY it failed in DevTools.
-        clearAvailabilityFromTimeSelect();
-        if (statusEl) {
-          const hint = result.status === 404 ? 'function not deployed'
-                     : result.status === 500 ? 'env var likely missing'
-                     : result.status === 502 ? 'scraper rejected'
-                     : 'check console';
-          statusEl.textContent = `Couldn't load availability (${result.status || 'network'}) — ${hint}`;
-        }
-        return;
+      if (!statusEl) return;
+      if (!court || !court.code || court.code === 'TBD') { statusEl.textContent = ''; return; }
+      statusEl.className = 'avail-status';
+      statusEl.textContent = 'Checking availability…';
+      const state = await checkCourtSlot(court);
+      const when = `${labelForTime(bookingPrefs.time)} for ${bookingPrefs.duration} min`;
+      if (state === 'open') {
+        statusEl.className = 'avail-status avail-ok';
+        statusEl.textContent = `✓ ${when} looks open here`;
+      } else if (state === 'taken') {
+        statusEl.className = 'avail-status avail-bad';
+        statusEl.textContent = `✕ ${when} looks booked — try another time or court`;
+      } else {
+        statusEl.className = 'avail-status';
+        statusEl.textContent = `Couldn't confirm availability — WebTrac will show live slots`;
       }
-      applyAvailabilityToTimeSelect(result, statusEl);
     }
 
     function webtracUrl(code) {
@@ -1573,12 +1613,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           selectedSport = btn.dataset.sport;
           rememberSport(selectedSport);
           track('sport_selected', { sport: selectedSport });
-          continueToLocation();
+          // v2 flow: pick WHEN first, then we show available courts.
+          renderWhenPicker();
         });
       });
 
-      // Recent-court shortcut → jump to the court screen with the date/time
-      // picker, NOT directly to WebTrac. User still has to choose when to play.
+      // Recent-court shortcut → still goes through the When picker (so the user
+      // chooses date/time once), then straight to that court's confirm screen.
       const recent = document.getElementById('recentShortcut');
       if (recent) {
         recent.addEventListener('click', (e) => {
@@ -1590,12 +1631,124 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           selectedSport = sport;
           rememberSport(sport);
           track('recent_shortcut_used', { sport, court: court.id });
-          // No userLoc → no "show more courts" link and no distance.
-          // Pass the court without a dist field so the render hides the
-          // distance line and changes the label to just "Court".
-          renderPostBooking({ ...court });
+          // Pass the court so the When picker returns straight to it
+          // (no userLoc → no distance line, no "show more courts").
+          renderWhenPicker({ ...court });
         });
       }
+    }
+
+    // -------------------- v2: When picker (date + time + duration) --------------------
+    // Shown right after the sport pick. The user chooses WHEN once, up front;
+    // the choice persists through court selection so they never re-enter it.
+    //   returnCourt    optional — when set, "Save time" returns to that court's
+    //                  confirm screen instead of continuing to the court list.
+    //   returnUserLoc  optional — userLoc to preserve across an Edit round-trip.
+    function renderWhenPicker(returnCourt, returnUserLoc) {
+      initBookingPrefsIfNeeded();
+      const minDate = earliestValidDateISO();
+      const maxDate = maxBookingDateISO();
+      const editing = !!returnCourt;
+
+      function timeOptionsHtml(iso) {
+        const opts = validBookingTimesForDate(iso);
+        if (!opts.length) return '<option value="">No times left this day</option>';
+        return opts.map(t =>
+          `<option value="${t.value}"${t.value === bookingPrefs.time ? ' selected' : ''}>${t.label}</option>`
+        ).join('');
+      }
+
+      card.innerHTML = `
+        ${backLinkHtml}
+        ${sportIconSvg(selectedSport, false)}
+        <h1>When do you<br><em>want to play?</em></h1>
+        <p class="perm-body">Arlington takes bookings 1–14 days out, at least 24 hours ahead.</p>
+        <div class="when-picker">
+          <p class="when-label">Date &amp; time</p>
+          <div class="when-row">
+            <input class="when-input" type="date" id="prefDate"
+                   min="${minDate}" max="${maxDate}" value="${bookingPrefs.date}" required>
+            <select class="when-input" id="prefTime" required>
+              ${timeOptionsHtml(bookingPrefs.date)}
+            </select>
+          </div>
+          <p class="when-label">Duration</p>
+          <div class="duration-toggle" role="radiogroup" aria-label="Duration">
+            <button type="button" class="seg${bookingPrefs.duration === 60 ? ' active' : ''}" data-duration="60" role="radio" aria-checked="${bookingPrefs.duration === 60}">60 min</button>
+            <button type="button" class="seg${bookingPrefs.duration === 90 ? ' active' : ''}" data-duration="90" role="radio" aria-checked="${bookingPrefs.duration === 90}">90 min</button>
+          </div>
+          <div class="avail-status" id="whenError"></div>
+        </div>
+        <button class="btn btn-primary" id="whenNextBtn">${editing ? 'Save time →' : 'Find courts →'}</button>
+      `;
+
+      const dateEl = document.getElementById('prefDate');
+      const timeEl = document.getElementById('prefTime');
+      const errEl  = document.getElementById('whenError');
+
+      // Rebuild the time list for whatever date is showing, keeping the user's
+      // pick if it's still valid, otherwise snapping to the first valid slot.
+      function rebuildTimes() {
+        const opts = validBookingTimesForDate(dateEl.value);
+        if (!opts.length) {
+          timeEl.innerHTML = '<option value="">No times left this day</option>';
+          return;
+        }
+        const keep = opts.some(t => t.value === bookingPrefs.time) ? bookingPrefs.time : opts[0].value;
+        bookingPrefs.time = keep;
+        timeEl.innerHTML = opts.map(t =>
+          `<option value="${t.value}"${t.value === keep ? ' selected' : ''}>${t.label}</option>`
+        ).join('');
+      }
+
+      dateEl.addEventListener('change', () => {
+        let v = dateEl.value;
+        if (!v) { dateEl.value = bookingPrefs.date; return; }
+        if (v < minDate) v = minDate;
+        if (v > maxDate) v = maxDate;
+        if (v !== dateEl.value) dateEl.value = v;
+        bookingPrefs.date = v;
+        errEl.className = 'avail-status';
+        errEl.textContent = '';
+        rebuildTimes();
+      });
+      timeEl.addEventListener('change', () => {
+        if (timeEl.value) {
+          bookingPrefs.time = timeEl.value;
+          errEl.className = 'avail-status';
+          errEl.textContent = '';
+        }
+      });
+      card.querySelectorAll('.duration-toggle .seg').forEach(seg => {
+        seg.addEventListener('click', () => {
+          bookingPrefs.duration = parseInt(seg.dataset.duration, 10);
+          card.querySelectorAll('.duration-toggle .seg').forEach(s => {
+            const active = s === seg;
+            s.classList.toggle('active', active);
+            s.setAttribute('aria-checked', String(active));
+          });
+        });
+      });
+
+      document.getElementById('whenNextBtn').addEventListener('click', () => {
+        // Final guard against the live 24h cutoff (handles a slow user / stale tab).
+        const valid = validBookingTimesForDate(bookingPrefs.date);
+        if (!valid.length || !valid.some(t => t.value === bookingPrefs.time)) {
+          errEl.className = 'avail-status avail-bad';
+          errEl.textContent = 'That time is now inside the 24-hour window — pick another.';
+          if (bookingPrefs.date < minDate) { bookingPrefs.date = minDate; dateEl.value = minDate; }
+          rebuildTimes();
+          return;
+        }
+        track('when_selected', {
+          sport: selectedSport, date: bookingPrefs.date,
+          time: bookingPrefs.time, duration: bookingPrefs.duration,
+        });
+        if (returnCourt) renderPostBooking(returnCourt, returnUserLoc);
+        else continueToLocation();
+      });
+
+      wireBackLink();
     }
 
     const backLinkHtml = `<button class="back-link" id="backLink">← Sports</button>`;
@@ -1616,8 +1769,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         </div>
         <h1>Find<br><em>your court</em></h1>
         <p class="perm-body">
-          We'll use your location to pick the right court and open the court's
-          availability on WebTrac.
+          We'll use your location to show the closest courts and check which
+          ones are open for your time.
         </p>
         <button class="btn btn-primary" id="allowBtn">Use my location</button>
         <button class="btn btn-secondary" id="pickBtn">Pick manually</button>
@@ -1682,7 +1835,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           const userLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
           const sorted = courtsWithDistances(userLoc.lat, userLoc.lng);
           const court = sorted[0];
-          const second = sorted[1];
           if (!court || !court.code || court.code === 'TBD') {
             renderFallback(
               court
@@ -1693,16 +1845,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             );
             return;
           }
-          // Auto-route if user is clearly AT a court. Two-pronged check
-          // because GPS error alone can push them past a strict absolute distance.
-          // The dominant-nearest branch is distance-capped so a user miles away
-          // never gets auto-routed just because one court is closer than the rest.
-          const withinAbsolute = court.dist <= AT_COURT_THRESHOLD_MI;
-          const dominantNearest = second
-            ? (court.dist <= DOMINANT_NEAREST_MAX_MI &&
-               court.dist < second.dist * DOMINANT_NEAREST_RATIO)
-            : false; // single-court case: rely on withinAbsolute only
-          if (withinAbsolute || dominantNearest) {
+          // If GPS says the user is basically standing on a court, skip the
+          // list and go straight to that court's confirm screen. Otherwise
+          // always show the closest-courts list.
+          if (court.dist <= AT_COURT_THRESHOLD_MI) {
             renderPostBooking(court, userLoc);
           } else {
             renderFallback(null, userLoc);
@@ -1761,10 +1907,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         <a href="#" id="showMoreCourtsLink" class="inline-link" style="display: inline-block; margin-top: 14px; font-size: 14px;">Show more courts →</a>
       ` : '';
 
-      // v2: pre-render booking prefs so the picker is populated.
       initBookingPrefsIfNeeded();
-      const minDateAttr = defaultBookingDateISO();
-      const maxDateAttr = maxBookingDateISO();
 
       const header = court ? `
         ${sportIconSvg(selectedSport, false)}
@@ -1774,32 +1917,24 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         <div class="weather-line" id="weatherLine" hidden></div>
         ${metaHtml}
 
-        <div class="when-picker">
-          <p class="when-label">When?</p>
-          <div class="when-row">
-            <input class="when-input" type="date"
-                   id="prefDate" min="${minDateAttr}" max="${maxDateAttr}"
-                   value="${bookingPrefs.date}" required>
-            <select class="when-input" id="prefTime" required>
-              ${listBookingTimes().map(t => `
-                <option value="${t.value}"${t.value === bookingPrefs.time ? ' selected' : ''}>${t.label}</option>
-              `).join('')}
-            </select>
+        <div class="when-summary">
+          <div class="when-summary-row">
+            <div>
+              <div class="when-summary-label">Your slot</div>
+              <div class="when-summary-text">${bookingWhenSummary()}</div>
+            </div>
+            <button type="button" class="when-edit" id="editWhenBtn">Edit</button>
           </div>
-          <div class="duration-toggle" role="radiogroup" aria-label="Duration">
-            <button type="button" class="seg${bookingPrefs.duration === 60 ? ' active' : ''}" data-duration="60" role="radio" aria-checked="${bookingPrefs.duration === 60}">60 min</button>
-            <button type="button" class="seg${bookingPrefs.duration === 90 ? ' active' : ''}" data-duration="90" role="radio" aria-checked="${bookingPrefs.duration === 90}">90 min</button>
-          </div>
-          <div class="avail-status" id="availStatus"></div>
+          <div class="avail-status" id="availStatus">Checking availability…</div>
         </div>
 
-        <button class="btn btn-primary" id="openWebtracBtn">Open booking site →</button>
+        <button class="btn btn-primary" id="openWebtracBtn">Open this slot on WebTrac →</button>
         <div class="secondary-actions">
           <a class="btn btn-ghost" id="directionsBtn"
              href="${directionsUrl(court)}" target="_blank" rel="noopener">Directions</a>
           <button class="btn btn-ghost" id="shareBtn" type="button">Share</button>
         </div>
-        <div class="rules-hint">Reservations open 1–14 days ahead · 60 or 90 min slots</div>
+        <div class="rules-hint">WebTrac opens at your time — pick a court, add to cart, then log in to confirm.</div>
         ${showMoreCourtsHtml}
         <div class="cta-divider">While you're here</div>
       ` : `
@@ -1827,59 +1962,30 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       });
 
       if (court) {
-        // Wire the When picker — update bookingPrefs live on change.
-        const dateEl = document.getElementById('prefDate');
-        const timeEl = document.getElementById('prefTime');
         const availStatusEl = document.getElementById('availStatus');
-        if (dateEl) dateEl.addEventListener('change', () => {
-          if (dateEl.value) {
-            bookingPrefs.date = dateEl.value;
-            // Date changed → availability data is stale; refetch for the new date.
-            refreshAvailability(court, availStatusEl);
-          }
-        });
-        if (timeEl) timeEl.addEventListener('change', () => {
-          if (timeEl.value) bookingPrefs.time = timeEl.value;
-        });
-        // Initial fetch on screen render. Fire-and-forget; if it fails we keep
-        // showing every slot as selectable so the user can still proceed.
+        // Check whether the user's chosen slot is open at this specific court.
         refreshAvailability(court, availStatusEl);
-        card.querySelectorAll('.duration-toggle .seg').forEach(seg => {
-          seg.addEventListener('click', () => {
-            bookingPrefs.duration = parseInt(seg.dataset.duration, 10);
-            card.querySelectorAll('.duration-toggle .seg').forEach(s => {
-              const active = s === seg;
-              s.classList.toggle('active', active);
-              s.setAttribute('aria-checked', String(active));
-            });
-          });
+
+        // Edit → back to the When picker, then return to this same court.
+        document.getElementById('editWhenBtn').addEventListener('click', () => {
+          renderWhenPicker(court, userLoc);
         });
 
         document.getElementById('openWebtracBtn').addEventListener('click', () => {
-          // Prefer the live cart-add URL for the selected slot — combined with
-          // the search params, this lands the user on the full 8am–9pm grid
-          // with their slot already in the WebTrac cart. Falls back to the
-          // plain search URL if availability didn't load.
-          const slotUrl = selectedSlotBookingUrl();
-          const fallbackUrl = webtracUrl(court.code);
-          const url = slotUrl ? buildCartAddUrl(slotUrl, court) : fallbackUrl;
-          console.log('[booking] opening WebTrac with prefs:', {
-            court: court.id,
-            sport: selectedSport,
-            date: bookingPrefs.date,
-            time: bookingPrefs.time,
-            duration: bookingPrefs.duration,
-            mode: slotUrl ? 'slot→cart' : 'search-page',
+          // Deep-link to the WebTrac results grid scoped to the chosen time +
+          // duration, so the user's slot is the slot on screen — they pick a
+          // court column and add to cart, then log in. (Truly pre-loading the
+          // cart needs the server-side booking worker; this is the reliable
+          // path for a static site.)
+          const url = webtracUrl(court.code);
+          console.log('[booking] opening WebTrac:', {
+            court: court.id, sport: selectedSport,
+            date: bookingPrefs.date, time: bookingPrefs.time, duration: bookingPrefs.duration,
           });
           console.log('[booking] URL:', url);
           track('webtrac_opened', {
-            sport: selectedSport,
-            court: court.id,
-            source: 'auto-route',
-            duration: bookingPrefs.duration,
-            date: bookingPrefs.date,
-            time: bookingPrefs.time,
-            mode: slotUrl ? 'cart' : 'search',
+            sport: selectedSport, court: court.id,
+            duration: bookingPrefs.duration, date: bookingPrefs.date, time: bookingPrefs.time,
           });
           sessionStorage.setItem('lastBooking', JSON.stringify({ sport: selectedSport, when: Date.now() }));
           rememberLastCourt(court.id);
@@ -1898,8 +2004,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           const el = document.getElementById('weatherLine');
           if (el && line) { el.textContent = line; el.hidden = false; }
         });
-        // "Show more courts" — present whenever a court is shown.
-        // With userLoc → distance-sorted nearby list. Without → alphabetical pick.
+        // "Show more courts" — back to the closest-courts list.
         const showMore = document.getElementById('showMoreCourtsLink');
         if (showMore) {
           showMore.addEventListener('click', (e) => {
@@ -2209,29 +2314,39 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     const NEARBY_INITIAL_COUNT = 3;
 
-    // Renders the court list. Two modes:
-    //   - With userLoc (sorted by distance, distances shown)   → "Closest X courts"
-    //                                                            shows top 3 + Show more + CTAs
-    //   - Without userLoc (alphabetical, no distances)         → "Pick an X court"
-    //                                                            full list, no CTAs
-    function renderFallback(errMsg, userLoc) {
+    // Renders the court list. Reached AFTER the user has chosen date/time —
+    // that choice persists, so picking a court never re-asks for it.
+    //
+    // Modes:
+    //   nearby (have userLoc, !manualMode) → closest 3 courts with live
+    //       availability badges for the chosen slot, plus "Show more courts"
+    //       and "Pick from all courts".
+    //   manual (no userLoc, OR manualMode) → full alphabetical list. Availability
+    //       is only scraped when the user opens a specific court.
+    function renderFallback(errMsg, userLoc, manualMode) {
       const sport = SPORTS[selectedSport];
-      const nearby = userLoc != null;
+      const nearby = userLoc != null && !manualMode;
       const courts = nearby
         ? courtsWithDistances(userLoc.lat, userLoc.lng)
         : courtsForSelectedSport();
+
       const items = courts.map((c, i) => {
         const disabled = !c.code || c.code === 'TBD';
-        const right = disabled
-          ? '<span class="tag">setup needed</span>'
-          : (nearby
-              ? `<span class="pick-meta">${formatDist(c.dist)} <span class="pick-arrow">→</span></span>`
-              : '<span class="arrow">→</span>');
-        const hidden = nearby && i >= NEARBY_INITIAL_COUNT ? ' collapsed' : '';
-        // href="#" + JS preventDefault — tapping a court opens the date/time
-        // picker for that court rather than navigating directly to WebTrac.
+        const collapsed = nearby && i >= NEARBY_INITIAL_COUNT ? ' collapsed' : '';
+        let right;
+        if (disabled) {
+          right = '<span class="tag">setup needed</span>';
+        } else if (nearby) {
+          // Only the closest 3 get an eagerly-scraped availability badge.
+          const badge = i < NEARBY_INITIAL_COUNT
+            ? `<span class="avail-badge avail-badge--checking" data-avail-for="${c.id}">checking…</span>`
+            : '';
+          right = `<span class="pick-meta">${badge}${formatDist(c.dist)} <span class="pick-arrow">→</span></span>`;
+        } else {
+          right = '<span class="arrow">→</span>';
+        }
         return `
-          <a class="pick${disabled ? ' disabled' : ''}${hidden}" href="#" data-court-id="${c.id}">
+          <a class="pick${disabled ? ' disabled' : ''}${collapsed}" href="#" data-court-id="${c.id}">
             <span class="pick-name">${c.name}</span>
             ${right}
           </a>`;
@@ -2241,15 +2356,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         ? `Closest ${sport.label.toLowerCase()} courts`
         : `Pick a ${sport.label.toLowerCase()} court`;
       const sub = nearby
-        ? `<p class="perm-body" style="margin-bottom: 16px;">Here are some courts near you.</p>`
-        : '';
+        ? `<p class="perm-body" style="margin-bottom: 14px;">Availability for <strong>${bookingWhenSummary()}</strong>.</p>`
+        : `<p class="perm-body" style="margin-bottom: 14px;">For <strong>${bookingWhenSummary()}</strong> — tap a court to check its slots.</p>`;
 
       const showMoreBtn = (nearby && courts.length > NEARBY_INITIAL_COUNT)
-        ? `<button class="btn btn-ghost" id="showMoreBtn" style="margin-top: 14px;">Show more</button>`
+        ? `<button class="btn btn-ghost" id="showMoreBtn" style="margin-top: 14px;">Show more courts</button>`
         : '';
-
-      const skipBtn = nearby
-        ? `<button class="btn btn-secondary" id="skipBtn">Continue to booking site</button>`
+      const pickManuallyBtn = nearby
+        ? `<button class="btn btn-secondary" id="pickManuallyBtn">Pick from all courts</button>`
         : '';
 
       const ctaSection = nearby ? `
@@ -2265,22 +2379,20 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         ${errMsg ? `<div class="error">${errMsg}</div>` : ''}
         <div class="picker">${items}</div>
         ${showMoreBtn}
-        ${skipBtn}
+        ${pickManuallyBtn}
         ${ctaSection}
       `;
 
-      // Tapping a court in the list now opens the date/time picker for that
-      // court (renderPostBooking). The actual WebTrac open happens later when
-      // the user taps "Open booking site →" in the picker.
+      // Tapping a court → its confirm screen. Date/time already chosen, so the
+      // confirm screen just verifies the slot for that court and opens WebTrac.
       card.querySelectorAll('a[data-court-id]').forEach(a => {
         a.addEventListener('click', (e) => {
           e.preventDefault();
-          const courtId = a.dataset.courtId;
-          const court = courts.find(c => c.id === courtId);
+          const court = courts.find(c => c.id === a.dataset.courtId);
           if (!court || !court.code || court.code === 'TBD') return;
           track('court_selected_from_list', {
             sport: selectedSport,
-            court: courtId,
+            court: court.id,
             source: nearby ? 'nearby-list' : 'manual-list',
           });
           renderPostBooking(court, userLoc);
@@ -2292,7 +2404,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         a.addEventListener('click', () => recordClick(a.dataset.ctaId));
       });
 
-      // Show more button reveals collapsed courts
+      // Show more reveals the rest of the distance-sorted list (no eager scrape).
       const showMore = document.getElementById('showMoreBtn');
       if (showMore) {
         showMore.addEventListener('click', () => {
@@ -2301,10 +2413,34 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         });
       }
 
-      // "Just take me to the booking site" — opens WebTrac with all courts of this sport
-      const skip = document.getElementById('skipBtn');
-      if (skip) {
-        skip.addEventListener('click', () => { location.href = webtracAllCourtsUrl(); });
+      // Pick from all courts → full alphabetical list, scrape-on-open.
+      const pickManually = document.getElementById('pickManuallyBtn');
+      if (pickManually) {
+        pickManually.addEventListener('click', () => {
+          track('pick_manually', { sport: selectedSport });
+          renderFallback(null, userLoc, true);
+        });
+      }
+
+      // Eager availability — closest 3 only. Each badge updates as it resolves.
+      if (nearby) {
+        courts.slice(0, NEARBY_INITIAL_COUNT)
+          .filter(c => c.code && c.code !== 'TBD')
+          .forEach(async (c) => {
+            const state = await checkCourtSlot(c);
+            const badge = card.querySelector(`.avail-badge[data-avail-for="${c.id}"]`);
+            if (!badge) return;
+            if (state === 'open') {
+              badge.textContent = 'open';
+              badge.className = 'avail-badge avail-badge--open';
+            } else if (state === 'taken') {
+              badge.textContent = 'booked';
+              badge.className = 'avail-badge avail-badge--taken';
+            } else {
+              badge.textContent = '';
+              badge.className = 'avail-badge';
+            }
+          });
       }
 
       wireBackLink();
