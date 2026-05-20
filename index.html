@@ -1986,9 +1986,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       });
     }
 
-    // Look up WebTrac's live AJAX URL for the selected 30-minute start block.
-    // v3 sends this only to our backend adapter; navigating to it directly is
-    // the known broken path that produces a raw {"status":"invalid"} page.
+    // Look up WebTrac's live selection URL for the selected 30-minute start block.
+    // The browser handoff uses these as short top-level navigations in the new
+    // WebTrac tab, then lands on the normal search page.
     function selectedSlotBookingUrl() {
       const select = document.getElementById('prefTime');
       if (!select) return null;
@@ -2498,17 +2498,125 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       });
     }
 
+    const WEBTRAC_ORIGIN = 'https://vaarlingtonweb.myvscloud.com';
+    const WEBTRAC_HANDOFF_STEP_MS = 1200;
+    let lastWebtracHandoffPayload = null;
+
+    function safeWebtracUrl(value) {
+      if (!value) return '';
+      try {
+        const url = new URL(value, WEBTRAC_ORIGIN);
+        return url.origin === WEBTRAC_ORIGIN ? url.toString() : '';
+      } catch (e) {
+        return '';
+      }
+    }
+
+    function timeToWebtracSeconds(timeHHMM) {
+      const [h, m] = String(timeHHMM || '').split(':').map(Number);
+      if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
+      return (h * 60 + m) * 60;
+    }
+
+    function expandedSelectionUrls(payload) {
+      const expectedBlocks = Math.max(1, Math.round((payload.duration || 60) / 30));
+      const urls = (payload.webtracUpdateSelectionUrls || [])
+        .map(safeWebtracUrl)
+        .filter(Boolean);
+      const unique = [];
+      urls.forEach(url => {
+        if (!unique.includes(url)) unique.push(url);
+      });
+      if (!unique.length) return [];
+      if (unique.length >= expectedBlocks) return unique.slice(0, expectedBlocks);
+
+      const first = new URL(unique[0]);
+      const firstStart = timeToWebtracSeconds(payload.start);
+      if (firstStart == null) return unique;
+      const generated = [];
+      for (let i = 0; i < expectedBlocks; i += 1) {
+        const url = new URL(first.toString());
+        url.searchParams.set('GlobalSalesArea_FRHeadCount', String(BOOKING_HEADCOUNT));
+        url.searchParams.set('GlobalSalesArea_FRItemBeginDate', payload.dateWebtrac);
+        url.searchParams.set('GlobalSalesArea_FRItemEndDate', payload.dateWebtrac);
+        url.searchParams.set('GlobalSalesArea_FRItemBeginTime', String(firstStart + i * 1800));
+        url.searchParams.set('GlobalSalesArea_FRItemEndTime', String(firstStart + (i + 1) * 1800));
+        generated.push(url.toString());
+      }
+      return generated;
+    }
+
+    function webtracHandoffPlan(payload) {
+      const searchUrl = safeWebtracUrl(payload.webtracSearchUrl) || webtracUrl(payload.courtCode);
+      const selectionUrls = expandedSelectionUrls(payload);
+      const sequenceUrls = selectionUrls.length ? selectionUrls.concat(searchUrl) : [searchUrl];
+      return {
+        primaryUrl: sequenceUrls[0],
+        searchUrl,
+        selectionUrls,
+        sequenceUrls,
+        selectionCount: selectionUrls.length,
+      };
+    }
+
+    function writeWebtracLoadingPage(opened, payload, plan) {
+      try {
+        const label = payload.courtUnitDisplayName
+          ? `${payload.courtName} ${payload.courtUnitDisplayName}`
+          : payload.courtName;
+        opened.document.open();
+        opened.document.write(`<!doctype html>
+          <html><head><title>Opening WebTrac</title>
+          <meta name="viewport" content="width=device-width,initial-scale=1">
+          <style>
+            body{margin:0;min-height:100vh;display:grid;place-items:center;background:#071015;color:#f4f7fb;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+            main{max-width:520px;padding:32px;text-align:center}
+            h1{font-size:24px;margin:0 0 12px}
+            p{color:#a7b1c2;font-size:17px;line-height:1.45;margin:0}
+          </style></head><body><main>
+            <h1>Loading your WebTrac selection</h1>
+            <p>${escapeHtml(label)} · ${escapeHtml(formatBookingWindow())}</p>
+            <p>${plan.selectionCount ? 'Selecting your exact time blocks, then opening the normal WebTrac page.' : 'Opening the matching WebTrac search page.'}</p>
+          </main></body></html>`);
+        opened.document.close();
+      } catch (e) {}
+    }
+
+    function openWebtracHandoff(payload) {
+      const plan = webtracHandoffPlan(payload);
+      const opened = window.open('', '_blank');
+      if (!opened) return { opened: false, plan };
+      writeWebtracLoadingPage(opened, payload, plan);
+      plan.sequenceUrls.forEach((url, index) => {
+        const delay = index === 0 ? 120 : WEBTRAC_HANDOFF_STEP_MS * index;
+        window.setTimeout(() => {
+          try { opened.location.href = url; } catch (e) {}
+        }, delay);
+      });
+      window.setTimeout(() => {
+        try { opened.opener = null; } catch (e) {}
+      }, WEBTRAC_HANDOFF_STEP_MS * plan.sequenceUrls.length + 500);
+      return { opened: true, plan };
+    }
+
+    function setManualWebtracFallback(el, payload) {
+      if (!el) return null;
+      const plan = webtracHandoffPlan(payload);
+      el.href = plan.primaryUrl;
+      el.hidden = false;
+      el.textContent = plan.selectionCount
+        ? 'Open selected WebTrac blocks →'
+        : 'Open WebTrac in a new tab →';
+      return plan;
+    }
+
     async function submitInAppBooking(court, statusEl, manualFallbackEl, buttonEl) {
       const payload = buildBookingPayload(court);
-      const targetUrl = payload.webtracSearchUrl;
+      lastWebtracHandoffPayload = payload;
       const courtLabel = payload.courtUnitDisplayName
         ? `${payload.courtName} ${payload.courtUnitDisplayName}`
         : payload.courtName;
-      if (manualFallbackEl) {
-        manualFallbackEl.href = targetUrl;
-        manualFallbackEl.hidden = false;
-        manualFallbackEl.textContent = 'Open WebTrac in a new tab →';
-      }
+      const fallbackPlan = setManualWebtracFallback(manualFallbackEl, payload);
       if (buttonEl) {
         buttonEl.disabled = true;
         buttonEl.textContent = 'Opening WebTrac...';
@@ -2522,18 +2630,20 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         time: bookingPrefs.time,
         source: 'production-reserve',
       });
-      const opened = window.open(targetUrl, '_blank');
-      if (opened) opened.opener = null;
+      const handoff = openWebtracHandoff(payload);
+      const plan = handoff.plan || fallbackPlan || webtracHandoffPlan(payload);
       if (buttonEl) {
         buttonEl.disabled = false;
         buttonEl.textContent = 'Open WebTrac again';
       }
       setReserveStatus(
         statusEl,
-        opened
-          ? `Opened Arlington WebTrac in a new tab for ${courtLabel} on ${formatBookingWindow()}. Complete final checkout through Arlington.`
+        handoff.opened
+          ? (plan.selectionCount
+              ? `Opened WebTrac in a new tab and loaded ${plan.selectionCount} selected time blocks for ${courtLabel} on ${formatBookingWindow()}. Complete final checkout through Arlington.`
+              : `Opened Arlington WebTrac in a new tab for ${courtLabel} on ${formatBookingWindow()}. Complete final checkout through Arlington.`)
           : `Your browser blocked the new tab. Use the WebTrac button below for ${courtLabel} on ${formatBookingWindow()}.`,
-        opened ? 'ok' : 'warn'
+        handoff.opened ? 'ok' : 'warn'
       );
     }
 
@@ -3176,11 +3286,30 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         const reserveStatusEl = document.getElementById('reserveStatus');
         const manualFallbackEl = document.getElementById('manualWebtracBtn');
         const reserveBtn = document.getElementById('reserveBtn');
+        if (manualFallbackEl) {
+          manualFallbackEl.addEventListener('click', (event) => {
+            if (!lastWebtracHandoffPayload) return;
+            event.preventDefault();
+            const handoff = openWebtracHandoff(lastWebtracHandoffPayload);
+            const payload = lastWebtracHandoffPayload;
+            const courtLabel = payload.courtUnitDisplayName
+              ? `${payload.courtName} ${payload.courtUnitDisplayName}`
+              : payload.courtName;
+            setReserveStatus(
+              reserveStatusEl,
+              handoff.opened
+                ? `Opened WebTrac in a new tab for ${courtLabel} on ${formatBookingWindow()}.`
+                : 'Your browser still blocked the new tab. Try allowing popups for Courtside, then tap again.',
+              handoff.opened ? 'ok' : 'warn'
+            );
+          });
+        }
 
         const updateRangeLabel = () => {
           if (rangeEl) rangeEl.textContent = formatBookingWindow();
         };
         const resetReserveFeedback = () => {
+          lastWebtracHandoffPayload = null;
           if (reserveStatusEl) reserveStatusEl.hidden = true;
           if (reserveBtn) {
             reserveBtn.hidden = false;
