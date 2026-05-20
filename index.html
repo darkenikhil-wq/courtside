@@ -2586,14 +2586,16 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     function webtracHandoffPlan(payload) {
       const searchUrl = safeWebtracUrl(payload.webtracSearchUrl) || webtracUrl(payload.courtCode);
       const selectionUrls = expandedSelectionUrls(payload);
-      const sequenceUrls = selectionUrls.length ? selectionUrls.concat(searchUrl) : [searchUrl];
       return {
-        primaryUrl: sequenceUrls[0],
+        primaryUrl: searchUrl,
         searchUrl,
         selectionUrls,
-        sequenceUrls,
         selectionCount: selectionUrls.length,
       };
+    }
+
+    function jsonForInlineScript(value) {
+      return JSON.stringify(value).replace(/</g, '\\u003c');
     }
 
     function writeWebtracLoadingPage(opened, payload, plan) {
@@ -2601,6 +2603,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         const label = payload.courtUnitDisplayName
           ? `${payload.courtName} ${payload.courtUnitDisplayName}`
           : payload.courtName;
+        const selectionJson = jsonForInlineScript(plan.selectionUrls);
+        const searchJson = jsonForInlineScript(plan.searchUrl);
+        const stepMsJson = jsonForInlineScript(WEBTRAC_HANDOFF_STEP_MS);
         opened.document.open();
         opened.document.write(`<!doctype html>
           <html><head><title>Opening WebTrac</title>
@@ -2614,7 +2619,36 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             <h1>Loading your WebTrac selection</h1>
             <p>${escapeHtml(label)} · ${escapeHtml(formatBookingWindow())}</p>
             <p>${plan.selectionCount ? 'Selecting your exact time blocks, then opening the normal WebTrac page.' : 'Opening the matching WebTrac search page.'}</p>
-          </main></body></html>`);
+          </main>
+          <script>
+            (function () {
+              var selectionUrls = ${selectionJson};
+              var searchUrl = ${searchJson};
+              var stepMs = ${stepMsJson};
+              function finish() {
+                window.location.replace(searchUrl);
+              }
+              if (!selectionUrls.length) {
+                window.setTimeout(finish, 250);
+                return;
+              }
+              var frame = document.createElement('iframe');
+              frame.setAttribute('aria-hidden', 'true');
+              frame.style.cssText = 'position:absolute;width:1px;height:1px;left:-9999px;top:-9999px;border:0;opacity:0;';
+              document.body.appendChild(frame);
+              var index = 0;
+              function loadNext() {
+                if (index >= selectionUrls.length) {
+                  window.setTimeout(finish, 450);
+                  return;
+                }
+                frame.src = selectionUrls[index++];
+                window.setTimeout(loadNext, stepMs);
+              }
+              window.setTimeout(loadNext, 150);
+            })();
+          <\/script>
+          </body></html>`);
         opened.document.close();
       } catch (e) {}
     }
@@ -2624,15 +2658,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const opened = window.open('', '_blank');
       if (!opened) return { opened: false, plan };
       writeWebtracLoadingPage(opened, payload, plan);
-      plan.sequenceUrls.forEach((url, index) => {
-        const delay = index === 0 ? 120 : WEBTRAC_HANDOFF_STEP_MS * index;
-        window.setTimeout(() => {
-          try { opened.location.href = url; } catch (e) {}
-        }, delay);
-      });
       window.setTimeout(() => {
         try { opened.opener = null; } catch (e) {}
-      }, WEBTRAC_HANDOFF_STEP_MS * plan.sequenceUrls.length + 500);
+      }, WEBTRAC_HANDOFF_STEP_MS * Math.max(1, plan.selectionCount) + 1000);
       return { opened: true, plan };
     }
 
