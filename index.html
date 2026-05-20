@@ -2858,7 +2858,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         ${timePickerHtml()}
         <div class="time-search-actions">
           <button class="btn btn-primary" id="nearbySearchBtn" type="button">Find courts near me</button>
-          <button class="btn btn-secondary" id="browseCourtsBtn" type="button">Browse all courts</button>
+          <button class="btn btn-secondary" id="browseCourtsBtn" type="button">Manual court selection</button>
           <button class="btn btn-ghost" id="atCourtBtn" type="button">I'm at a court</button>
         </div>
         <p class="rules-hint">Arlington rules: 1-14 days ahead · 60 or 90 min · closes 9pm</p>
@@ -2867,8 +2867,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       wireStandaloneTimePicker();
       document.getElementById('nearbySearchBtn').addEventListener('click', requestCourtSearchLocation);
       document.getElementById('browseCourtsBtn').addEventListener('click', () => {
-        track('court_search_browse_all', { sport: selectedSport });
-        renderCourtSearchResults(null);
+        track('court_search_manual_started', { sport: selectedSport });
+        renderCourtSearchResults(null, null, { mode: 'manual' });
       });
       document.getElementById('atCourtBtn').addEventListener('click', () => {
         track('at_court_flow_started', { sport: selectedSport });
@@ -2880,7 +2880,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     function requestCourtSearchLocation() {
       renderSearchLocating();
       if (!('geolocation' in navigator)) {
-        renderCourtSearchResults(null, 'Your browser does not support geolocation, so here are all courts for this sport.');
+        renderCourtSearchResults(null, 'Your browser does not support geolocation. Choose a court manually and we will check it next.', { mode: 'manual' });
         return;
       }
       navigator.geolocation.getCurrentPosition(
@@ -2892,13 +2892,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         err => {
           track('court_search_location_failed', { code: err.code, sport: selectedSport });
           const msg = err.code === 1
-            ? 'Location is blocked. You can still browse all courts for this time.'
+            ? 'Location is blocked. Choose a court manually and we will check it next.'
             : err.code === 2
-              ? "Couldn't determine your location. Showing all courts instead."
+              ? "Couldn't determine your location. Choose a court manually instead."
               : err.code === 3
-                ? 'Location request timed out. Showing all courts instead.'
-                : 'Could not get your location. Showing all courts instead.';
-          renderCourtSearchResults(null, msg);
+                ? 'Location request timed out. Choose a court manually instead.'
+                : 'Could not get your location. Choose a court manually instead.';
+          renderCourtSearchResults(null, msg, { mode: 'manual' });
         },
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
       );
@@ -3668,9 +3668,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     let courtSearchRunId = 0;
-    const RESULT_COLLAPSED_LIMIT = 5;
+    const RESULT_BATCH_SIZE = 5;
 
-    function initialResultSummaryForCourt(court) {
+    function initialResultSummaryForCourt(court, options = {}) {
       const disabled = !court.code || court.code === 'TBD';
       if (disabled) {
         return {
@@ -3678,6 +3678,17 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           label: 'Setup',
           detail: 'WebTrac setup needed',
           rankBucket: 4,
+          openCount: 0,
+          totalCount: court.numCourts || 0,
+          availabilityRatio: 0,
+        };
+      }
+      if (options.mode === 'manual') {
+        return {
+          tone: 'manual',
+          label: 'Select',
+          detail: 'Tap to check availability',
+          rankBucket: 1,
           openCount: 0,
           totalCount: court.numCourts || 0,
           availabilityRatio: 0,
@@ -3699,52 +3710,32 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       return [distance, summary.detail].filter(Boolean).join(' · ');
     }
 
-    function availabilityRankBucket(summary) {
-      if (Number.isFinite(summary && summary.rankBucket)) return summary.rankBucket;
-      if (summary && summary.tone === 'open') return 0;
-      if (summary && summary.tone === 'warn') return 2;
-      if (summary && summary.tone === 'full') return 3;
-      return 1;
+    function orderedResultStates(resultStates) {
+      return Array.from(resultStates.values()).sort((a, b) => a.index - b.index);
     }
 
-    function compareResultStates(a, b, nearby) {
-      const bucketDelta = availabilityRankBucket(a.summary) - availabilityRankBucket(b.summary);
-      if (bucketDelta) return bucketDelta;
-
-      if (nearby) {
-        const distA = typeof a.court.dist === 'number' ? a.court.dist : Number.POSITIVE_INFINITY;
-        const distB = typeof b.court.dist === 'number' ? b.court.dist : Number.POSITIVE_INFINITY;
-        const distanceDelta = distA - distB;
-        if (Math.abs(distanceDelta) > 0.001) return distanceDelta;
-      }
-
-      const ratioDelta = (b.summary.availabilityRatio || 0) - (a.summary.availabilityRatio || 0);
-      if (Math.abs(ratioDelta) > 0.001) return ratioDelta;
-
-      const openDelta = (b.summary.openCount || 0) - (a.summary.openCount || 0);
-      if (openDelta) return openDelta;
-
-      return a.court.name.localeCompare(b.court.name) || a.index - b.index;
+    function visibleResultStates(resultStates) {
+      return orderedResultStates(resultStates).slice(0, resultStates.visibleLimit || RESULT_BATCH_SIZE);
     }
 
-    function rerankResultCards(resultStates, nearby) {
+    function syncResultCards(resultStates) {
       const list = card.querySelector('.result-list');
       if (!list || !resultStates) return;
-      const orderedStates = Array.from(resultStates.values())
-        .sort((a, b) => compareResultStates(a, b, nearby));
+      const orderedStates = orderedResultStates(resultStates);
 
       orderedStates.forEach((state, index) => {
         const node = list.querySelector(`[data-result-court-id="${state.court.id}"]`);
         if (!node) return;
-        node.hidden = !resultStates.expanded && index >= RESULT_COLLAPSED_LIMIT;
+        node.hidden = index >= (resultStates.visibleLimit || RESULT_BATCH_SIZE);
         list.appendChild(node);
       });
 
       const showMoreBtn = document.getElementById('showMoreResultsBtn');
       if (!showMoreBtn) return;
-      const hiddenCount = Math.max(0, orderedStates.length - RESULT_COLLAPSED_LIMIT);
-      showMoreBtn.hidden = resultStates.expanded || hiddenCount === 0;
-      showMoreBtn.textContent = `Show ${hiddenCount} more courts`;
+      const hiddenCount = Math.max(0, orderedStates.length - (resultStates.visibleLimit || RESULT_BATCH_SIZE));
+      const nextCount = Math.min(RESULT_BATCH_SIZE, hiddenCount);
+      showMoreBtn.hidden = hiddenCount === 0;
+      showMoreBtn.textContent = `Show ${nextCount} more court${nextCount === 1 ? '' : 's'}`;
     }
 
     function resultCardHtml(court, nearby, summary = initialResultSummaryForCourt(court)) {
@@ -3771,12 +3762,16 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       metaEl.textContent = resultMetaText(court, summary, nearby);
       if (resultStates && resultStates.has(court.id)) {
         resultStates.get(court.id).summary = summary;
-        rerankResultCards(resultStates, nearby);
       }
     }
 
-    async function loadCourtSearchAvailability(courts, nearby, runId, resultStates) {
-      const queue = courts.filter(c => c.code && c.code !== 'TBD');
+    async function loadVisibleCourtSearchAvailability(nearby, runId, resultStates) {
+      if (!resultStates || resultStates.mode !== 'nearby') return;
+      if (!resultStates.loadedCourtIds) resultStates.loadedCourtIds = new Set();
+      const queue = visibleResultStates(resultStates)
+        .map(state => state.court)
+        .filter(c => c.code && c.code !== 'TBD' && !resultStates.loadedCourtIds.has(c.id));
+      queue.forEach(c => resultStates.loadedCourtIds.add(c.id));
       let next = 0;
       const worker = async () => {
         while (next < queue.length) {
@@ -3786,13 +3781,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           updateResultCard(court, availabilitySummaryForSelectedRange(availability, court), nearby, resultStates);
         }
       };
-      await Promise.all([worker(), worker(), worker()]);
+      await Promise.all([worker(), worker()]);
     }
 
-    function renderCourtSearchResults(userLoc, errMsg) {
+    function renderCourtSearchResults(userLoc, errMsg, options = {}) {
       initBookingPrefsIfNeeded();
       const sport = SPORTS[selectedSport];
-      const nearby = userLoc != null;
+      const nearby = userLoc != null && options.mode !== 'manual';
+      const mode = nearby ? 'nearby' : 'manual';
       const courts = nearby
         ? courtsWithDistances(userLoc.lat, userLoc.lng)
         : courtsForSelectedSport();
@@ -3801,16 +3797,18 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         {
           court,
           index,
-          summary: initialResultSummaryForCourt(court),
+          summary: initialResultSummaryForCourt(court, { mode }),
         },
       ]));
-      resultStates.expanded = courts.length <= RESULT_COLLAPSED_LIMIT;
+      resultStates.mode = mode;
+      resultStates.visibleLimit = Math.min(RESULT_BATCH_SIZE, courts.length);
+      resultStates.loadedCourtIds = new Set();
       const title = nearby
         ? `${sport.label} near you`
-        : `${sport.label} courts`;
+        : 'Select a court';
       const summary = nearby
-        ? `Ranking available courts first, then nearest options for ${formatBookingWindow()}.`
-        : `Ranking available ${sport.label.toLowerCase()} courts first for ${formatBookingWindow()}.`;
+        ? `Showing nearest courts for ${formatBookingWindow()}. Availability loads only for courts shown.`
+        : `Choose a ${sport.label.toLowerCase()} court. We will check live availability only after you open that court.`;
 
       const runId = ++courtSearchRunId;
       card.innerHTML = `
@@ -3839,27 +3837,29 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           track('court_selected_from_results', {
             sport: selectedSport,
             court: courtId,
-            source: nearby ? 'nearby-availability' : 'all-availability',
+            source: nearby ? 'nearby-availability' : 'manual-selection',
           });
           renderPostBooking(court, userLoc, { lockedWhen: true });
         });
       });
 
       document.getElementById('showMoreResultsBtn')?.addEventListener('click', () => {
-        resultStates.expanded = true;
-        rerankResultCards(resultStates, nearby);
+        resultStates.visibleLimit = Math.min(courts.length, (resultStates.visibleLimit || RESULT_BATCH_SIZE) + RESULT_BATCH_SIZE);
+        syncResultCards(resultStates);
         track('court_results_expanded', {
           sport: selectedSport,
-          source: nearby ? 'nearby-availability' : 'all-availability',
+          source: nearby ? 'nearby-availability' : 'manual-selection',
+          visible: resultStates.visibleLimit,
         });
+        loadVisibleCourtSearchAvailability(nearby, runId, resultStates);
       });
       document.getElementById('changeTimeBtn')?.addEventListener('click', () => renderTimeFirstSearch());
       document.getElementById('manualAllBtn')?.addEventListener('click', () => {
         track('manual_webtrac_all_opened', { sport: selectedSport });
       });
       wireBackLink();
-      rerankResultCards(resultStates, nearby);
-      loadCourtSearchAvailability(courts, nearby, runId, resultStates);
+      syncResultCards(resultStates);
+      loadVisibleCourtSearchAvailability(nearby, runId, resultStates);
     }
 
     function renderFallback(errMsg, userLoc) {
