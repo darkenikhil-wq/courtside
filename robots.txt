@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /?view=dashboard
+
+Sitemap: https://courtsidereservations.com/sitemap.xml
