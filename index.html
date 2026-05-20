@@ -467,14 +467,20 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       margin-bottom: 10px;
     }
     .date-chip-row {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 7px;
-      margin-bottom: 10px;
+      display: flex;
+      gap: 8px;
+      margin: 0 -2px 10px;
+      padding: 2px 2px 8px;
+      overflow-x: auto;
+      scroll-snap-type: x proximity;
+      scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
     }
+    .date-chip-row::-webkit-scrollbar { display: none; }
     .date-chip {
-      min-height: 48px;
-      padding: 8px 6px;
+      flex: 0 0 74px;
+      min-height: 50px;
+      padding: 8px 7px;
       background: var(--card);
       border: 1.5px solid var(--line);
       border-radius: 8px;
@@ -484,6 +490,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       font-size: 12px;
       line-height: 1.15;
       cursor: pointer;
+      scroll-snap-align: start;
       transition: border-color 0.15s, color 0.15s, background 0.15s;
     }
     .date-chip:hover { border-color: rgba(var(--accent-rgb), 0.30); }
@@ -495,6 +502,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     .date-chip:disabled {
       cursor: not-allowed;
       opacity: 0.42;
+    }
+    .date-chip:focus-visible {
+      outline: 2px solid rgba(var(--accent-rgb), 0.55);
+      outline-offset: 2px;
     }
     .date-chip span {
       display: block;
@@ -1138,7 +1149,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     @media (max-width: 480px) {
       .card { padding: 36px 24px 28px; border-radius: 24px; }
       h1 { font-size: 32px; }
-      .date-chip-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .date-chip { flex-basis: 68px; }
       .result-card { grid-template-columns: 1fr; align-items: stretch; }
       .result-status { width: max-content; min-width: 0; }
       .results-toolbar { grid-template-columns: 1fr; }
@@ -1606,7 +1617,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
     function dateChipsHtml() {
       return `
-        <div class="date-chip-row" aria-label="Quick dates">
+        <div class="date-chip-row" aria-label="Bookable dates, 1 to 14 days ahead">
           ${weekDateOptions().map(item => `
             <button type="button" class="date-chip${item.iso === bookingPrefs.date ? ' active' : ''}" data-date="${item.iso}" aria-pressed="${item.iso === bookingPrefs.date}"${item.disabled ? ' disabled' : ''}>
               ${item.day}<span>${item.date}</span>
@@ -1712,14 +1723,15 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       initBookingPrefsIfNeeded();
       return isoToWebtracDate(bookingPrefs.date);
     }
-    // Manual fallback URL: always show WebTrac's full 8am-9pm grid. The selected
-    // time is not sent as the display begin time, which avoids the Quincy-style
-    // "auto-selected random slot" behavior from the earlier experiment.
-    const WEBTRAC_DISPLAY_BEGIN_TIME = '08:00 am';
-    const WEBTRAC_DISPLAY_BLOCKS     = '26';      // 8am to 9pm in 30-min blocks
 
-    function bookingBeginTime()       { return WEBTRAC_DISPLAY_BEGIN_TIME; }
-    function bookingBlocksToDisplay() { return WEBTRAC_DISPLAY_BLOCKS; }
+    function bookingBeginTime() {
+      initBookingPrefsIfNeeded();
+      return time24toWebtracTime(bookingPrefs.time);
+    }
+    function bookingBlocksToDisplay() {
+      initBookingPrefsIfNeeded();
+      return durationToBlocks(bookingPrefs.duration);
+    }
 
     // -------------------- Availability (live slot data via Netlify Function) --------------------
     // GET /.netlify/functions/availability?court=…&date=MM/DD/YYYY&sport=…
@@ -2489,10 +2501,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     async function submitInAppBooking(court, statusEl, manualFallbackEl, buttonEl) {
       const payload = buildBookingPayload(court);
       const targetUrl = payload.webtracSearchUrl;
+      const courtLabel = payload.courtUnitDisplayName
+        ? `${payload.courtName} ${payload.courtUnitDisplayName}`
+        : payload.courtName;
       if (manualFallbackEl) {
         manualFallbackEl.href = targetUrl;
         manualFallbackEl.hidden = false;
-        manualFallbackEl.textContent = 'Open Arlington WebTrac →';
+        manualFallbackEl.textContent = 'Open WebTrac in a new tab →';
       }
       if (buttonEl) {
         buttonEl.disabled = true;
@@ -2507,12 +2522,19 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         time: bookingPrefs.time,
         source: 'production-reserve',
       });
+      const opened = window.open(targetUrl, '_blank');
+      if (opened) opened.opener = null;
+      if (buttonEl) {
+        buttonEl.disabled = false;
+        buttonEl.textContent = 'Open WebTrac again';
+      }
       setReserveStatus(
         statusEl,
-        'Opening Arlington WebTrac with this court and date. Choose the matching time block and complete final checkout through Arlington.',
-        'ok'
+        opened
+          ? `Opened Arlington WebTrac in a new tab for ${courtLabel} on ${formatBookingWindow()}. Complete final checkout through Arlington.`
+          : `Your browser blocked the new tab. Use the WebTrac button below for ${courtLabel} on ${formatBookingWindow()}.`,
+        opened ? 'ok' : 'warn'
       );
-      window.location.href = targetUrl;
     }
 
     // -------------------- Views --------------------
@@ -3110,7 +3132,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         <button class="btn btn-primary" id="reserveBtn">Continue to booking</button>
         <div class="reserve-status" id="reserveStatus" hidden></div>
         <a class="btn btn-secondary" id="manualWebtracBtn"
-           href="${webtracUrl(court.code)}" hidden>Open Arlington WebTrac →</a>
+           href="${webtracUrl(court.code)}" target="_blank" rel="noopener" hidden>Open WebTrac in a new tab →</a>
         <div class="secondary-actions">
           <a class="btn btn-ghost" id="directionsBtn"
              href="${directionsUrl(court)}" target="_blank" rel="noopener">Directions</a>
