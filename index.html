@@ -492,12 +492,40 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       color: var(--accent);
       background: rgba(var(--accent-rgb), 0.06);
     }
+    .date-chip:disabled {
+      cursor: not-allowed;
+      opacity: 0.42;
+    }
     .date-chip span {
       display: block;
       margin-top: 3px;
       color: var(--ink);
       font-size: 13px;
       font-weight: 700;
+    }
+    .when-locked {
+      display: grid;
+      gap: 10px;
+    }
+    .selected-when {
+      padding: 13px 14px;
+      border-radius: 10px;
+      border: 1.5px solid rgba(var(--accent-rgb), 0.32);
+      background: rgba(var(--accent-rgb), 0.08);
+      text-align: left;
+    }
+    .selected-when strong {
+      display: block;
+      color: var(--ink);
+      font-size: 16px;
+      line-height: 1.25;
+    }
+    .selected-when span {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
     }
     .when-input {
       width: 100%;
@@ -580,6 +608,16 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       border-color: var(--accent);
       background: rgba(var(--accent-rgb), 0.08);
     }
+    .court-unit-btn.unavailable {
+      cursor: not-allowed;
+      opacity: 0.58;
+      border-color: rgba(248, 113, 113, 0.28);
+      background: rgba(248, 113, 113, 0.055);
+    }
+    .court-unit-btn.unavailable:hover {
+      transform: none;
+      border-color: rgba(248, 113, 113, 0.28);
+    }
     .court-unit-name {
       display: block;
       font-weight: 700;
@@ -657,90 +695,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       font-size: 12px;
       line-height: 1.45;
       color: var(--muted);
-    }
-    .agreement-backdrop {
-      position: fixed;
-      inset: 0;
-      z-index: 1200;
-      display: grid;
-      place-items: center;
-      padding: 20px;
-      background: rgba(4, 8, 13, 0.72);
-      backdrop-filter: blur(10px);
-    }
-    .agreement-backdrop[hidden] { display: none; }
-    .agreement-sheet {
-      width: min(100%, 430px);
-      max-height: min(720px, calc(100vh - 40px));
-      overflow: auto;
-      padding: 22px;
-      border-radius: 20px;
-      border: 1px solid rgba(var(--accent-rgb), 0.26);
-      background: var(--card);
-      box-shadow: 0 24px 70px -28px rgba(0, 0, 0, 0.70);
-      text-align: left;
-    }
-    .agreement-kicker {
-      margin: 0 0 8px;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.13em;
-      text-transform: uppercase;
-      color: var(--accent);
-    }
-    .agreement-title {
-      margin: 0 0 10px;
-      font-size: 24px;
-      line-height: 1.15;
-      color: var(--ink);
-    }
-    .agreement-summary {
-      margin: 0 0 14px;
-      font-size: 14px;
-      line-height: 1.5;
-      color: var(--muted);
-    }
-    .agreement-list {
-      display: grid;
-      gap: 9px;
-      margin: 0 0 16px;
-      padding: 0;
-      list-style: none;
-    }
-    .agreement-list li {
-      padding: 10px 11px;
-      border: 1px solid var(--line);
-      border-radius: 10px;
-      background: rgba(255,255,255,0.035);
-      color: var(--ink);
-      font-size: 13px;
-      line-height: 1.45;
-    }
-    .agreement-check {
-      display: grid;
-      grid-template-columns: 20px 1fr;
-      gap: 10px;
-      align-items: start;
-      margin: 0 0 16px;
-      color: var(--ink);
-      font-size: 13px;
-      line-height: 1.45;
-    }
-    .agreement-check input {
-      width: 18px;
-      height: 18px;
-      margin: 2px 0 0;
-      accent-color: var(--accent);
-    }
-    .agreement-actions {
-      display: grid;
-      grid-template-columns: 1fr 1.35fr;
-      gap: 10px;
-    }
-    .agreement-actions .btn { margin-bottom: 0; }
-    @media (max-width: 480px) {
-      .agreement-sheet { padding: 20px; border-radius: 18px; }
-      .agreement-actions { grid-template-columns: 1fr; }
     }
     .payment-status {
       margin-top: 8px;
@@ -1622,24 +1576,29 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       d.setDate(d.getDate() + BOOKING_MIN_DAYS_AHEAD);
       return formatLocalDate(d);
     }
+    function minBookingDateISO() {
+      const d = new Date();
+      d.setDate(d.getDate() + BOOKING_MIN_DAYS_AHEAD);
+      return formatLocalDate(d);
+    }
     function maxBookingDateISO() {
       const d = new Date();
       d.setDate(d.getDate() + BOOKING_MAX_DAYS_AHEAD);
       return formatLocalDate(d);
     }
     function weekDateOptions() {
-      const first = parseISODate(defaultBookingDateISO());
-      const max = parseISODate(maxBookingDateISO());
+      const today = new Date();
       const labels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
       const out = [];
-      for (let i = 0; i < 7; i += 1) {
-        const d = new Date(first);
-        d.setDate(first.getDate() + i);
-        if (d > max) break;
+      for (let offset = BOOKING_MIN_DAYS_AHEAD; offset <= BOOKING_MAX_DAYS_AHEAD; offset += 1) {
+        const d = new Date(today);
+        d.setDate(today.getDate() + offset);
         const iso = formatLocalDate(d);
+        const times = listBookingTimesForDate(bookingPrefs.duration, iso);
         out.push({
           iso,
-          day: i === 0 ? 'Tomorrow' : labels[d.getDay()],
+          disabled: times.length === 0,
+          day: offset === 1 ? 'Tomorrow' : labels[d.getDay()],
           date: `${d.getMonth() + 1}/${d.getDate()}`,
         });
       }
@@ -1649,7 +1608,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       return `
         <div class="date-chip-row" aria-label="Quick dates">
           ${weekDateOptions().map(item => `
-            <button type="button" class="date-chip${item.iso === bookingPrefs.date ? ' active' : ''}" data-date="${item.iso}" aria-pressed="${item.iso === bookingPrefs.date}">
+            <button type="button" class="date-chip${item.iso === bookingPrefs.date ? ' active' : ''}" data-date="${item.iso}" aria-pressed="${item.iso === bookingPrefs.date}"${item.disabled ? ' disabled' : ''}>
               ${item.day}<span>${item.date}</span>
             </button>
           `).join('')}
@@ -1994,7 +1953,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           }
         }
       });
-      if (select.options[select.selectedIndex] && select.options[select.selectedIndex].disabled) {
+      if (!select.dataset.lockSelectedTime && select.options[select.selectedIndex] && select.options[select.selectedIndex].disabled) {
         const next = Array.from(select.options).find(o => !o.disabled);
         if (next) {
           select.value = next.value;
@@ -2039,6 +1998,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       return opt.dataset.bookingUrl ? [opt.dataset.bookingUrl] : [];
     }
 
+    function selectedTimeIsAvailableInPicker() {
+      const select = document.getElementById('prefTime');
+      if (!select) return true;
+      const opt = select.options[select.selectedIndex];
+      return Boolean(opt && !opt.disabled);
+    }
+
     function selectedCourtUnitKey(court) {
       return `${selectedSport}|${court && court.id || 'court'}|${bookingPrefs.date || ''}`;
     }
@@ -2058,13 +2024,17 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       return availabilityStartValuesForSlots(unit && unit.slots || [], true).length > 0;
     }
 
+    function courtUnitAvailableForSelectedRange(unit) {
+      return slotRangeAvailable(unit && unit.slots || [], true);
+    }
+
     function selectedCourtUnitFor(court, availability) {
       const units = Array.isArray(availability && availability.courts) ? availability.courts : [];
       if (!units.length) return null;
       const key = selectedCourtUnitKey(court);
       const savedId = selectedCourtUnits.get(key);
-      let unit = units.find(u => u.id === savedId);
-      if (!unit) unit = units.find(courtUnitHasAvailability) || units[0];
+      let unit = units.find(u => u.id === savedId && courtUnitAvailableForSelectedRange(u));
+      if (!unit) unit = units.find(courtUnitAvailableForSelectedRange) || units[0];
       selectedCourtUnits.set(key, unit.id);
       return unit;
     }
@@ -2105,11 +2075,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     function availabilitySummaryForUnit(unit) {
+      if (courtUnitAvailableForSelectedRange(unit)) return 'Available';
       const starts = availabilityStartValuesForSlots(unit && unit.slots || [], true);
-      if (!starts.length) return 'Full';
+      if (!starts.length) return 'Unavailable';
       const first = listOperatingTimes(bookingPrefs.duration).find(t => t.value === starts[0]);
-      const count = starts.length;
-      return `${count} open${first ? ` · first ${first.label}` : ''}`;
+      return first ? `Unavailable · next ${first.label}` : 'Unavailable';
     }
 
     function renderCourtUnitSelector(court, availability, statusEl, onChange) {
@@ -2127,15 +2097,18 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const selectedUnit = selectedCourtUnitFor(court, availability);
       grid.innerHTML = units.map((unit) => {
         const active = selectedUnit && unit.id === selectedUnit.id;
+        const available = courtUnitAvailableForSelectedRange(unit);
         const display = friendlyCourtUnitLabel(unit.label, court && court.name);
         return `
           <button type="button"
-                  class="court-unit-btn${active ? ' active' : ''}"
+                  class="court-unit-btn${active ? ' active' : ''}${available ? '' : ' unavailable'}"
                   data-court-unit-id="${escapeHtml(unit.id)}"
                   data-court-unit-label="${escapeHtml(unit.label)}"
                   data-court-unit-display="${escapeHtml(display)}"
                   data-webtrac-facility-id="${escapeHtml(unit.webtracFacilityId || '')}"
-                  aria-pressed="${active}">
+                  aria-pressed="${active}"
+                  aria-disabled="${available ? 'false' : 'true'}"
+                  ${available ? '' : 'disabled'}>
             <span class="court-unit-name">${escapeHtml(display)}</span>
             <span class="court-unit-meta">${escapeHtml(availabilitySummaryForUnit(unit))}</span>
           </button>`;
@@ -2143,6 +2116,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
       grid.querySelectorAll('.court-unit-btn').forEach(btn => {
         btn.addEventListener('click', () => {
+          if (btn.disabled) return;
           selectedCourtUnits.set(selectedCourtUnitKey(court), btn.dataset.courtUnitId);
           grid.querySelectorAll('.court-unit-btn').forEach(other => {
             const active = other === btn;
@@ -2184,7 +2158,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         clearAvailabilityFromTimeSelect();
         if (reserveBtn && !reserveBtn.hidden) {
           reserveBtn.disabled = false;
-          reserveBtn.textContent = 'Continue to WebTrac';
+          reserveBtn.textContent = 'Continue to booking';
         }
         if (statusEl) {
           const hint = result.status === 404 ? 'function not deployed'
@@ -2204,13 +2178,16 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         { requireKnownSlots: availability.courts.length > 1 }
       );
       if (bookingPrefs.time !== beforeTime && onUnitChange) onUnitChange();
+      const canBookSelectedTime = selectedTimeIsAvailableInPicker();
       if (reserveBtn && !reserveBtn.hidden) {
-        reserveBtn.disabled = false;
-        reserveBtn.textContent = 'Continue to WebTrac';
+        reserveBtn.disabled = !canBookSelectedTime;
+        reserveBtn.textContent = canBookSelectedTime ? 'Continue to booking' : 'Unavailable at this time';
       }
       if (statusEl && availability.courts.length > 1) {
         const unit = selectedCourtUnitFor(court, availability);
-        statusEl.textContent = `Showing availability for ${friendlyCourtUnitLabel(unit.label, court.name)}.`;
+        statusEl.textContent = canBookSelectedTime
+          ? `Choose an available court for ${formatBookingWindow()}.`
+          : `No ${court.name} courts are available for ${formatBookingWindow()}.`;
       }
     }
 
@@ -2313,75 +2290,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           if (timer) window.clearTimeout(timer);
         }
       };
-    }
-
-    function showBookingAgreement(court) {
-      return new Promise((resolve) => {
-        const existing = document.getElementById('bookingAgreement');
-        if (existing) existing.remove();
-
-        const courtUnit = selectedCourtUnitPayload(court);
-        const courtLabel = [
-          court?.name,
-          courtUnit?.displayLabel || courtUnit?.label,
-          bookingPrefs.date,
-          formatBookingWindow(),
-        ].filter(Boolean).join(' · ');
-
-        const backdrop = document.createElement('div');
-        backdrop.className = 'agreement-backdrop';
-        backdrop.id = 'bookingAgreement';
-        backdrop.setAttribute('role', 'dialog');
-        backdrop.setAttribute('aria-modal', 'true');
-        backdrop.setAttribute('aria-labelledby', 'bookingAgreementTitle');
-        backdrop.innerHTML = `
-          <div class="agreement-sheet">
-            <p class="agreement-kicker">Arlington/WebTrac agreement</p>
-            <h2 class="agreement-title" id="bookingAgreementTitle">Tennis and Pickleball Agreements</h2>
-            <p class="agreement-summary">
-              Arlington WebTrac requires the Tennis and Pickleball Agreements before this court can be added to cart. Courtside will send you to WebTrac for:
-              <strong>${escapeHtml(courtLabel)}</strong>
-            </p>
-            <ul class="agreement-list">
-              <li>I accept Arlington's Tennis and Pickleball Agreements for this reservation request.</li>
-              <li>I understand Courtside will open Arlington WebTrac with this court and date prefilled where WebTrac supports it; I will choose the matching time block on WebTrac.</li>
-              <li>I understand final selection, checkout, payment, cancellation, and refund handling happen through Arlington County Parks & Recreation/WebTrac.</li>
-            </ul>
-            <label class="agreement-check">
-              <input type="checkbox" id="bookingAgreementCheck">
-              <span>I accept the Arlington Tennis and Pickleball Agreements and want to continue to Arlington WebTrac.</span>
-            </label>
-            <div class="agreement-actions">
-              <button class="btn btn-ghost" type="button" id="bookingAgreementCancel">Cancel</button>
-              <button class="btn btn-primary" type="button" id="bookingAgreementAccept" disabled>Agree and continue</button>
-            </div>
-          </div>
-        `;
-
-        const finish = (accepted) => {
-          backdrop.remove();
-          document.removeEventListener('keydown', onKeydown);
-          resolve(accepted);
-        };
-        const onKeydown = (event) => {
-          if (event.key === 'Escape') finish(false);
-        };
-
-        document.body.appendChild(backdrop);
-        const check = backdrop.querySelector('#bookingAgreementCheck');
-        const accept = backdrop.querySelector('#bookingAgreementAccept');
-        const cancel = backdrop.querySelector('#bookingAgreementCancel');
-        check?.focus();
-        check?.addEventListener('change', () => {
-          if (accept) accept.disabled = !check.checked;
-        });
-        accept?.addEventListener('click', () => finish(Boolean(check?.checked)));
-        cancel?.addEventListener('click', () => finish(false));
-        backdrop.addEventListener('click', (event) => {
-          if (event.target === backdrop) finish(false);
-        });
-        document.addEventListener('keydown', onKeydown);
-      });
     }
 
     let stripeScriptPromise = null;
@@ -2610,6 +2518,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     // -------------------- Views --------------------
     const card = document.getElementById('card');
 
+    function resetViewScroll() {
+      window.requestAnimationFrame(() => {
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+        if (typeof window.scrollTo === 'function') window.scrollTo(0, 0);
+      });
+    }
+
     const SPORT_ICONS = {
       tennis: `
         <circle cx="50" cy="50" r="46" fill="#d4ec3d"/>
@@ -2714,6 +2630,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           Point your camera at the QR
         </span>
       `;
+      resetViewScroll();
 
       // Make the generated SVG fill its container
       const svg = card.querySelector('.qr-wrap svg');
@@ -2731,7 +2648,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
       // Recent-court shortcut: only shown if the user has a remembered court
       // that's still in COURTS, supports the remembered sport, and is recent (< 30 days).
-      // One tap → straight to WebTrac for that court. New users see nothing here.
+      // Repeat users get a shortcut back to their recent court, then choose a
+      // valid Arlington booking window before continuing.
       let recentHtml = '';
       const RECENT_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
       if (prefs.lastCourt && prefs.lastCourtAt && (Date.now() - prefs.lastCourtAt) < RECENT_MAX_AGE_MS) {
@@ -2775,6 +2693,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         <a href="#" class="inline-link" data-action="share" data-cta-id="home-share"
            style="display: inline-block; margin-top: 18px; font-size: 14px;">Share Courtside →</a>
       `;
+      resetViewScroll();
 
       card.querySelectorAll('button[data-sport]').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -2816,7 +2735,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     function timePickerHtml() {
       initBookingPrefsIfNeeded();
-      const minDateAttr = defaultBookingDateISO();
+      const minDateAttr = minBookingDateISO();
       const maxDateAttr = maxBookingDateISO();
       return `
         <div class="when-picker">
@@ -2837,6 +2756,31 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             <button type="button" class="seg${bookingPrefs.duration === 90 ? ' active' : ''}" data-duration="90" role="radio" aria-checked="${bookingPrefs.duration === 90}">90 min</button>
           </div>
           <div class="booking-range" id="bookingRange">${formatBookingWindow()}</div>
+        </div>`;
+    }
+
+    function lockedTimePickerHtml() {
+      initBookingPrefsIfNeeded();
+      return `
+        <div class="when-picker when-locked">
+          <p class="when-label">Selected time</p>
+          <div class="selected-when">
+            <strong>${escapeHtml(formatBookingWindow())}</strong>
+            <span>Pick the exact court below. To change the day, time, or duration, go back to the time search.</span>
+          </div>
+          <input type="hidden" id="prefDate" value="${escapeHtml(bookingPrefs.date)}">
+          <select id="prefTime" hidden data-lock-selected-time="true" aria-hidden="true">
+            ${listBookingTimes(bookingPrefs.duration).map(t => `
+              <option value="${t.value}"${t.value === bookingPrefs.time ? ' selected' : ''}>${t.label}</option>
+            `).join('')}
+          </select>
+          <button class="btn btn-secondary" id="changeTimeDetailBtn" type="button">Change time</button>
+          <div class="booking-range" id="bookingRange">${formatBookingWindow()}</div>
+          <div class="court-unit-picker" id="courtUnitPicker" hidden>
+            <p class="when-label">Court</p>
+            <div class="court-unit-grid" id="courtUnitGrid"></div>
+          </div>
+          <div class="avail-status" id="availStatus"></div>
         </div>`;
     }
 
@@ -2919,6 +2863,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         </div>
         <p class="rules-hint">Arlington rules: 1-14 days ahead · 60 or 90 min · closes 9pm</p>
       `;
+      resetViewScroll();
       wireStandaloneTimePicker();
       document.getElementById('nearbySearchBtn').addEventListener('click', requestCourtSearchLocation);
       document.getElementById('browseCourtsBtn').addEventListener('click', () => {
@@ -2976,6 +2921,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         <button class="btn btn-primary" id="allowBtn">Use my court location</button>
         <button class="btn btn-secondary" id="pickBtn">Search by time instead</button>
       `;
+      resetViewScroll();
       document.getElementById('allowBtn').addEventListener('click', requestLocation);
       document.getElementById('pickBtn').addEventListener('click', () => renderTimeFirstSearch());
       wireBackLink();
@@ -2987,6 +2933,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         <h1>Checking your<br><em>court location</em></h1>
         <p class="status" id="status">Getting your location…</p>
       `;
+      resetViewScroll();
     }
 
     function renderSearchLocating() {
@@ -2995,6 +2942,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         <h1>Checking<br><em>availability</em></h1>
         <p class="status" id="status">Finding courts near you for ${formatBookingWindow()}…</p>
       `;
+      resetViewScroll();
     }
 
     function renderDeniedHelp() {
@@ -3024,6 +2972,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         <button class="btn btn-outline" id="pickBtn">Search by time instead</button>
         <button class="btn btn-secondary" id="skipBtn">Just open the booking site</button>
       `;
+      resetViewScroll();
       document.getElementById('retryBtn').addEventListener('click', () => location.reload());
       document.getElementById('skipBtn').addEventListener('click', () => {
         location.href = webtracAllCourtsUrl();
@@ -3086,7 +3035,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     //   - no court         → "Got your slot?" + CTAs + Book another (back from WebTrac)
     // userLoc (optional) is only used to wire the "show more courts" link back
     // to the nearby-list view — preserves the user's location across the navigation.
-    function renderPostBooking(court, userLoc) {
+    function renderPostBooking(court, userLoc, options = {}) {
       // Allow URL param to override sport for testing/direct linking
       const sportParam = params.get('sport');
       if (sportParam && SPORTS[sportParam]) selectedSport = sportParam;
@@ -3119,17 +3068,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
       // v3: pre-render booking prefs so the picker is populated.
       initBookingPrefsIfNeeded();
-      const minDateAttr = defaultBookingDateISO();
+      const lockedWhen = Boolean(options.lockedWhen);
+      const minDateAttr = minBookingDateISO();
       const maxDateAttr = maxBookingDateISO();
-
-      const header = court ? `
-        ${sportIconSvg(selectedSport, false)}
-        <p class="status">${courtLabel}</p>
-        <div class="nearest-name">${court.name}</div>
-        ${distText ? `<div class="nearest-dist">${distText}</div>` : ''}
-        <div class="weather-line" id="weatherLine" hidden></div>
-        ${metaHtml}
-
+      const whenPicker = lockedWhen ? lockedTimePickerHtml() : `
         <div class="when-picker">
           <p class="when-label">When?</p>
           <div class="when-row">
@@ -3153,9 +3095,19 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             <div class="court-unit-grid" id="courtUnitGrid"></div>
           </div>
           <div class="avail-status" id="availStatus"></div>
-        </div>
+        </div>`;
 
-        <button class="btn btn-primary" id="reserveBtn">Continue to WebTrac</button>
+      const header = court ? `
+        ${sportIconSvg(selectedSport, false)}
+        <p class="status">${courtLabel}</p>
+        <div class="nearest-name">${court.name}</div>
+        ${distText ? `<div class="nearest-dist">${distText}</div>` : ''}
+        <div class="weather-line" id="weatherLine" hidden></div>
+        ${metaHtml}
+
+        ${whenPicker}
+
+        <button class="btn btn-primary" id="reserveBtn">Continue to booking</button>
         <div class="reserve-status" id="reserveStatus" hidden></div>
         <a class="btn btn-secondary" id="manualWebtracBtn"
            href="${webtracUrl(court.code)}" hidden>Open Arlington WebTrac →</a>
@@ -3187,6 +3139,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         <div class="cta-list">${items}</div>
         ${footer}
       `;
+      resetViewScroll();
 
       card.querySelectorAll('a[data-cta-id]').forEach(a => {
         a.addEventListener('click', () => recordClick(a.dataset.ctaId));
@@ -3210,7 +3163,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           if (reserveBtn) {
             reserveBtn.hidden = false;
             reserveBtn.disabled = false;
-            reserveBtn.textContent = 'Continue to WebTrac';
+            reserveBtn.textContent = 'Continue to booking';
           }
           if (manualFallbackEl) {
             manualFallbackEl.href = webtracUrl(court.code);
@@ -3294,6 +3247,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           });
         });
         refreshAvailability(court, availStatusEl, resetBookingUi);
+        document.getElementById('changeTimeDetailBtn')?.addEventListener('click', () => {
+          track('detail_change_time', { sport: selectedSport, court: court.id });
+          renderTimeFirstSearch();
+        });
 
         reserveBtn.addEventListener('click', async () => {
           console.log('[booking] reserve requested:', {
@@ -3303,20 +3260,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             time: bookingPrefs.time,
             duration: bookingPrefs.duration,
           });
-          track('booking_agreement_opened', {
-            sport: selectedSport,
-            court: court.id,
-            duration: bookingPrefs.duration,
-            date: bookingPrefs.date,
-            time: bookingPrefs.time,
-          });
-          const acceptedAgreement = await showBookingAgreement(court);
-          if (!acceptedAgreement) {
-            track('booking_agreement_declined', {
-              sport: selectedSport,
-              court: court.id,
-              duration: bookingPrefs.duration,
-            });
+          if (!selectedTimeIsAvailableInPicker()) {
+            setReserveStatus(
+              reserveStatusEl,
+              `That court is unavailable for ${formatBookingWindow()}. Pick another court or change time.`,
+              'warn'
+            );
             return;
           }
           track('booking_requested', {
@@ -3325,11 +3274,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             duration: bookingPrefs.duration,
             date: bookingPrefs.date,
             time: bookingPrefs.time,
-          });
-          track('booking_agreement_accepted', {
-            sport: selectedSport,
-            court: court.id,
-            duration: bookingPrefs.duration,
           });
           submitInAppBooking(court, reserveStatusEl, manualFallbackEl, reserveBtn);
         });
@@ -3467,6 +3411,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         </div>
         <button class="btn btn-secondary" id="homeBtn" style="margin-top: 14px;">Back to start</button>
       `;
+      resetViewScroll();
 
       document.getElementById('homeBtn').addEventListener('click', () => { location.href = location.pathname; });
 
@@ -3586,6 +3531,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
         <button class="btn btn-secondary" id="homeBtn" style="margin-top: 4px;">Back to start</button>
       `;
+      resetViewScroll();
       document.getElementById('homeBtn').addEventListener('click', () => { location.href = location.pathname; });
       wireSupportPaymentModule();
       wireNotifyForm();
@@ -3628,6 +3574,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         ${COACHES.map(coachCardHtml).join('')}
         <button class="btn btn-secondary" id="homeBtn" style="margin-top: 2px;">Back to start</button>
       `;
+      resetViewScroll();
       document.getElementById('homeBtn').addEventListener('click', () => { location.href = location.pathname; });
       card.querySelectorAll('a[data-cta-id]').forEach(a => {
         a.addEventListener('click', () => recordClick(a.dataset.ctaId));
@@ -3654,6 +3601,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
            style="display: inline-block; margin: 14px auto 0; font-size: 14px;">Share Courtside →</a>
         <button class="btn btn-secondary" id="homeBtn" style="margin-top: 14px;">Back to start</button>
       `;
+      resetViewScroll();
       document.getElementById('homeBtn').addEventListener('click', () => { location.href = location.pathname; });
       wireNotifyForm();
       wireBackLink();
@@ -3662,6 +3610,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     function renderDashboard() {
       if (params.get('key') !== DASHBOARD_KEY) {
         card.innerHTML = `<h1>Not<br><em>found</em></h1><p class="perm-body">Nothing here.</p>`;
+        resetViewScroll();
         return;
       }
       const counts = getClickCounts();
@@ -3694,6 +3643,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         </div>
         <button class="btn btn-secondary" id="resetBtn">Reset counts</button>
       `;
+      resetViewScroll();
       document.getElementById('resetBtn').addEventListener('click', () => {
         if (confirm('Reset all click counts?')) {
           localStorage.removeItem(TRACK_KEY);
@@ -3878,6 +3828,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           <a class="btn btn-ghost" id="manualAllBtn" href="${webtracAllCourtsUrl()}">WebTrac fallback</a>
         </div>
       `;
+      resetViewScroll();
 
       card.querySelectorAll('a[data-result-court-id]').forEach(a => {
         a.addEventListener('click', (e) => {
@@ -3890,7 +3841,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             court: courtId,
             source: nearby ? 'nearby-availability' : 'all-availability',
           });
-          renderPostBooking(court, userLoc);
+          renderPostBooking(court, userLoc, { lockedWhen: true });
         });
       });
 
