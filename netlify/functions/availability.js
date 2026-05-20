@@ -15,6 +15,7 @@
 //
 // API key MUST be set as a Netlify environment variable:
 //   Site → Site configuration → Environment variables → add SCRAPER_API_KEY
+// The legacy/prod site currently uses SCRAPER_API, so keep that as a fallback.
 // Never hardcode the key in this file — it would land in the public-facing repo.
 
 exports.handler = async (event) => {
@@ -25,9 +26,9 @@ exports.handler = async (event) => {
     return jsonResponse(400, { error: 'Missing required params: court, date' });
   }
 
-  const apiKey = process.env.SCRAPER_API_KEY;
+  const apiKey = process.env.SCRAPER_API_KEY || process.env.SCRAPER_API;
   if (!apiKey) {
-    return jsonResponse(500, { error: 'SCRAPER_API_KEY env var not set' });
+    return jsonResponse(500, { error: 'SCRAPER_API_KEY or SCRAPER_API env var not set' });
   }
 
   // Build the WebTrac search URL. Arlington courts close at 9pm, so the v3
