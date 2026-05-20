@@ -2245,12 +2245,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     const BOOKING_PROGRESS_MESSAGES = [
-      'Checking live availability with Arlington WebTrac...',
-      'Courtside keeps you here, but the reservation is made through Arlington County Parks & Recreation.',
+      'Selecting the requested time block with Arlington WebTrac...',
+      'Courtside selects the slot, then Arlington WebTrac handles login, cart, and checkout.',
       'If the court is booked, Arlington/WebTrac should send the official confirmation details.',
       'Cancellation, adjustment, refund, and facility-use requests go through Arlington DPR/Facilities Scheduling.',
       'Arlington rental policy generally requires cancellation or adjustment requests at least 72 hours before use.',
-      'Checkout and payment stay paused until you explicitly confirm.'
+      'No WebTrac cart or payment step is handled by Courtside.'
     ];
 
     function startBookingProgressMessages(el) {
@@ -2901,17 +2901,25 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     async function submitInAppBooking(court, statusEl, manualFallbackEl, buttonEl, paymentPanelEl) {
-      const payload = buildBookingPayload(court);
-      let keepPostCartState = false;
+      const payload = {
+        ...buildBookingPayload(court),
+        selectionOnly: true,
+        reserveMode: 'select_only',
+      };
+      let keepSelectedState = false;
+      const courtLabel = payload.courtUnitDisplayName
+        ? `${payload.courtName} ${payload.courtUnitDisplayName}`
+        : payload.courtName;
       if (manualFallbackEl) {
         manualFallbackEl.href = payload.webtracSearchUrl;
         manualFallbackEl.hidden = true;
+        manualFallbackEl.textContent = 'Continue in WebTrac →';
       }
       if (paymentPanelEl) paymentPanelEl.hidden = true;
       activeStripePayment = null;
       if (buttonEl) {
         buttonEl.disabled = true;
-        buttonEl.textContent = 'Checking...';
+        buttonEl.textContent = 'Selecting slot...';
       }
       const progress = startBookingProgressMessages(statusEl);
 
@@ -2933,29 +2941,31 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           responseOk = polled.ok;
         }
 
-        if (responseOk && ['confirmed', 'qa_accepted', 'dry_run_ready', 'cart_updated'].includes(data.status)) {
+        if (responseOk && ['slot_selected', 'qa_accepted', 'dry_run_ready'].includes(data.status)) {
           progress.stop();
-          const cartReady = data.status === 'cart_updated';
-          const terminalBookingState = cartReady || data.status === 'confirmed';
-          track('booking_confirmed', {
+          track('webtrac_slot_selected', {
             sport: selectedSport,
             court: court.id,
             duration: bookingPrefs.duration,
+            date: bookingPrefs.date,
+            time: bookingPrefs.time,
+            status: data.status,
           });
           rememberLastCourt(court.id);
-          if (terminalBookingState && buttonEl) {
-            keepPostCartState = true;
-            buttonEl.hidden = true;
-            buttonEl.disabled = true;
+          if (manualFallbackEl) manualFallbackEl.hidden = false;
+          keepSelectedState = data.status === 'slot_selected';
+          if (buttonEl) {
+            buttonEl.hidden = false;
+            buttonEl.disabled = keepSelectedState;
+            buttonEl.textContent = keepSelectedState ? 'Slot selected' : 'Try again';
           }
           setReserveStatus(
             statusEl,
-            cartReady
-              ? 'Court added to the Arlington WebTrac cart. Confirm booking and payment below.'
-              : data.message || 'Booking request accepted.',
+            data.status === 'slot_selected'
+              ? `Selected ${courtLabel} for ${formatBookingWindow()} in WebTrac. Continue in WebTrac to log in, add the selection to your cart, and check out.`
+              : data.message || 'Booking request accepted for testing. No WebTrac slot was changed.',
             'ok'
           );
-          await prepareStripePayment(paymentPanelEl, data, payload);
           return;
         }
 
@@ -2983,9 +2993,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         setReserveStatus(statusEl, 'Booking service is not reachable. Manual fallback is available for testing.', 'warn');
       } finally {
         progress.stop();
-        if (buttonEl && !keepPostCartState) {
+        if (buttonEl && !keepSelectedState) {
           buttonEl.disabled = false;
-          buttonEl.textContent = 'Reserve this court';
+          buttonEl.textContent = 'Try again';
           buttonEl.hidden = false;
         }
       }
@@ -3706,33 +3716,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             time: bookingPrefs.time,
             duration: bookingPrefs.duration,
           });
-          track('booking_agreement_opened', {
-            sport: selectedSport,
-            court: court.id,
-            duration: bookingPrefs.duration,
-            date: bookingPrefs.date,
-            time: bookingPrefs.time,
-          });
-          const acceptedAgreement = await showBookingAgreement(court);
-          if (!acceptedAgreement) {
-            track('booking_agreement_declined', {
-              sport: selectedSport,
-              court: court.id,
-              duration: bookingPrefs.duration,
-            });
-            return;
-          }
           track('booking_requested', {
             sport: selectedSport,
             court: court.id,
             duration: bookingPrefs.duration,
             date: bookingPrefs.date,
             time: bookingPrefs.time,
-          });
-          track('booking_agreement_accepted', {
-            sport: selectedSport,
-            court: court.id,
-            duration: bookingPrefs.duration,
           });
           submitInAppBooking(court, reserveStatusEl, manualFallbackEl, reserveBtn, paymentPanelEl);
         });

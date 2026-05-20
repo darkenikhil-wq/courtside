@@ -1,14 +1,9 @@
-// Courtside Reservations v3 — booking request adapter.
+// Courtside Reservations — booking request adapter.
 //
 // This function validates the in-app booking intent against Arlington's public
-// rules, then hands the request to a future WebTrac booking agent if configured.
-// It intentionally does NOT navigate to WebTrac's UpdateSelection URL. That URL
-// is an AJAX endpoint and returns raw JSON when opened as a page.
-//
-// To enable true invisible booking later, deploy a separate Playwright/WebTrac
-// adapter and set:
-//   WEBTRAC_BOOKING_ADAPTER_URL=https://...
-//   WEBTRAC_BOOKING_ADAPTER_TOKEN=...
+// rules, then hands the request to the WebTrac worker if configured. The worker
+// now stops after WebTrac's slot-selection step; users continue in WebTrac for
+// login, add-to-cart, and checkout.
 
 const ALLOWED_DURATIONS = new Set([60, 90]);
 const ALLOWED_SPORT_TYPES = new Set(['TENNIS', 'PICKLE', 'VBALL']);
