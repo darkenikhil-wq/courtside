@@ -1223,9 +1223,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       <span class="dot">·</span>
       <a href="?view=coming-soon&cat=leagues" data-cta-id="footer-league" data-icon="trophy">Leagues</a>
       <span class="dot">·</span>
-      <a href="?view=coming-soon&cat=gear" data-cta-id="footer-gear" data-icon="bag">Gear</a>
-      <span class="dot">·</span>
-      <a href="?view=coming-soon&cat=work-with-us" data-cta-id="footer-work" data-icon="briefcase">Work with us</a>
+      <a href="?view=work-with-us" data-cta-id="footer-work" data-icon="briefcase">Work with us</a>
     </footer>
   </main>
 
@@ -1351,19 +1349,19 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         { id: 't-coach',  label: 'Coaches',      icon: 'coach',     url: '?view=coaches' },
         { id: 't-league', label: 'Leagues',      icon: 'trophy',    url: '?view=coming-soon&cat=tennis-league' },
         { id: 't-gear',   label: 'Gear',         icon: 'bag',       url: 'https://www.tennis-warehouse.com/' },
-        { id: 't-work',   label: 'Work with us', icon: 'briefcase', url: '?view=coming-soon&cat=work-with-us' },
+        { id: 't-work',   label: 'Work with us', icon: 'briefcase', url: '?view=work-with-us' },
       ],
       pickleball: [
         { id: 'pb-coach',  label: 'Coaches',      icon: 'coach',     url: '?view=coming-soon&cat=pickleball-coach' },
         { id: 'pb-league', label: 'Leagues',      icon: 'trophy',    url: '?view=coming-soon&cat=pickleball-league' },
         { id: 'pb-gear',   label: 'Gear',         icon: 'bag',       url: 'https://www.pickleballcentral.com/' },
-        { id: 'pb-work',   label: 'Work with us', icon: 'briefcase', url: '?view=coming-soon&cat=work-with-us' },
+        { id: 'pb-work',   label: 'Work with us', icon: 'briefcase', url: '?view=work-with-us' },
       ],
       volleyball: [
         { id: 'vb-coach',  label: 'Coaches',      icon: 'coach',     url: '?view=coming-soon&cat=volleyball-coach' },
         { id: 'vb-league', label: 'Leagues',      icon: 'trophy',    url: '?view=coming-soon&cat=volleyball-league' },
         { id: 'vb-gear',   label: 'Gear',         icon: 'bag',       url: 'https://www.mvw.com/' },
-        { id: 'vb-work',   label: 'Work with us', icon: 'briefcase', url: '?view=coming-soon&cat=work-with-us' },
+        { id: 'vb-work',   label: 'Work with us', icon: 'briefcase', url: '?view=work-with-us' },
       ],
     };
 
@@ -3945,6 +3943,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (view === 'dashboard')       return renderDashboard();
       if (view === 'coaches')         return renderCoaches();
       if (view === 'contact')         return renderContact();
+      if (view === 'work-with-us')    return renderWorkWithUs();
       if (view === 'coming-soon') {
         // The Work with us page has its own multi-module layout.
         if (params.get('cat') === 'work-with-us') return renderWorkWithUs();
