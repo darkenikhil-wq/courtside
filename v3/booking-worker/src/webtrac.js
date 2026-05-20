@@ -56,7 +56,7 @@ export async function reserveWithWebtrac(payload) {
       return {
         status: 'dry_run_ready',
         code: 'DRY_RUN_READY',
-        message: 'Logged in, reached WebTrac search, and found selection URLs. No cart mutation was attempted because DRY_RUN=true.',
+        message: 'Logged in, reached WebTrac search, and found selection URLs. No WebTrac slot was selected because DRY_RUN=true.',
         dryRun: true,
         requestedBlocks: selectionUrls.length,
         selectionSource,
@@ -68,33 +68,22 @@ export async function reserveWithWebtrac(payload) {
     for (const selectionUrl of selectionUrls) {
       addResults.push(await callUpdateSelection(page, selectionUrl));
     }
-    const addToCartResult = await addSelectedItemsToCart(page, searchUrl);
-    const promptResults = await completeCartPrompts(page, payload);
-
-    const cartState = await confirmCartState(page, searchUrl, payload);
-    const cartMatchesRequest = cartState.expectedMatch ? cartState.expectedMatch.ok : true;
-    const cartReady = addResults.every(r => r.ok) && cartState.confirmed && cartMatchesRequest;
-
+    const selectionReady = addResults.every(r => r.ok);
     return {
-      status: cartReady ? 'cart_updated' : 'cart_update_uncertain',
-      code: cartReady
-        ? 'WEBTRAC_CART_READY'
-        : cartState.confirmed && !cartMatchesRequest
-          ? 'WEBTRAC_CART_MISMATCH'
-          : 'WEBTRAC_CART_UPDATE_UNCERTAIN',
-      message: cartReady
-        ? 'Added to the WebTrac cart. Confirm payment in Courtside to complete Arlington/WebTrac checkout.'
-        : cartState.confirmed && !cartMatchesRequest
-          ? 'WebTrac cart does not match the requested court/time, so Courtside stopped before payment.'
-        : 'WebTrac accepted the selection request, but the worker could not confirm the item in the cart after retries.',
+      status: selectionReady ? 'slot_selected' : 'slot_selection_uncertain',
+      code: selectionReady ? 'WEBTRAC_SLOT_SELECTED' : 'WEBTRAC_SLOT_SELECTION_UNCERTAIN',
+      message: selectionReady
+        ? 'Selected the requested WebTrac time block(s). Continue in WebTrac to add the selection to cart.'
+        : 'WebTrac did not clearly confirm every selected block. Continue in WebTrac and verify the selected time before adding to cart.',
       dryRun: false,
       cartReset,
-      addResults,
-      addToCartResult,
-      promptResults,
+      requestedBlocks: selectionUrls.length,
       selectionSource,
-      cartState,
+      pageState,
+      selectionResults: addResults,
+      webtracSearchUrl: searchUrl,
     };
+
   } finally {
     await context.close().catch(() => {});
     await browser.close().catch(() => {});

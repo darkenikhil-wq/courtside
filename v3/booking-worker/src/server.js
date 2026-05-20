@@ -70,8 +70,8 @@ app.post('/reserve', async (req, res) => {
       status: result.status,
       code: result.code,
       selectionSource: result.selectionSource,
-      addToCart: result.addToCartResult,
-      prompts: result.promptResults,
+      requestedBlocks: result.requestedBlocks,
+      selectedBlocks: result.selectionResults?.filter((item) => item.ok).length,
       cart: result.cartState && {
         confirmed: result.cartState.confirmed,
         itemCount: result.cartState.itemCount,
@@ -79,7 +79,7 @@ app.post('/reserve', async (req, res) => {
         amountToday: result.cartState.amountToday,
       },
     });
-    const statusCode = result.status === 'cart_update_uncertain' ? 502 : 200;
+    const statusCode = reserveStatusCode(result.status);
     res.status(statusCode).json(result);
   } catch (e) {
     res.status(e.code === 'MISSING_ENV' ? 500 : 502).json({
@@ -332,7 +332,7 @@ function enqueueReserveJob(payload) {
       const result = await reserveWithWebtrac(payload);
       job.status = 'succeeded';
       job.result = result;
-      job.statusCode = result.status === 'cart_update_uncertain' ? 502 : 200;
+      job.statusCode = reserveStatusCode(result.status);
       console.log('[reserve:job]', {
         id: job.id,
         status: result.status,
@@ -507,6 +507,10 @@ async function cleanupReserveJobFiles(cutoff) {
   } catch {
     // The store is created lazily on the first reserve job.
   }
+}
+
+function reserveStatusCode(status) {
+  return status === 'slot_selection_uncertain' || status === 'cart_update_uncertain' ? 502 : 200;
 }
 
 function errorPayload(e, fallbackCode) {

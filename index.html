@@ -2314,12 +2314,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     const BOOKING_PROGRESS_MESSAGES = [
-      'Checking live availability with Arlington WebTrac...',
-      'Courtside keeps you here, but the reservation is made through Arlington County Parks & Recreation.',
+      'Selecting the requested time block with Arlington WebTrac...',
+      'Courtside selects the slot, then Arlington WebTrac handles login, cart, and checkout.',
       'If the court is booked, Arlington/WebTrac should send the official confirmation details.',
       'Cancellation, adjustment, refund, and facility-use requests go through Arlington DPR/Facilities Scheduling.',
       'Arlington rental policy generally requires cancellation or adjustment requests at least 72 hours before use.',
-      'Checkout and payment stay paused until you explicitly confirm.'
+      'No WebTrac cart or payment step is handled by Courtside.'
     ];
 
     function startBookingProgressMessages(el) {
@@ -2535,161 +2535,114 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       });
     }
 
-    const WEBTRAC_ORIGIN = 'https://vaarlingtonweb.myvscloud.com';
-    const WEBTRAC_HANDOFF_STEP_MS = 1200;
-    let lastWebtracHandoffPayload = null;
+    function setManualWebtracFallback(el, payload) {
+      if (!el) return null;
+      el.href = payload.webtracSearchUrl || webtracUrl(payload.courtCode);
+      el.hidden = false;
+      el.textContent = 'Continue in WebTrac →';
+      return { primaryUrl: el.href };
+    }
 
-    function safeWebtracUrl(value) {
-      if (!value) return '';
-      try {
-        const url = new URL(value, WEBTRAC_ORIGIN);
-        return url.origin === WEBTRAC_ORIGIN ? url.toString() : '';
-      } catch (e) {
-        return '';
+    async function pollBookingJob(jobId) {
+      const maxAttempts = 75;
+      let lastData = null;
+      for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+        await new Promise(resolve => setTimeout(resolve, attempt === 0 ? 1200 : 2000));
+        const res = await fetch(`/.netlify/functions/reserve-status?jobId=${encodeURIComponent(jobId)}`, {
+          headers: { 'Cache-Control': 'no-store' },
+        });
+        const data = await res.json().catch(() => ({}));
+        lastData = data;
+        if (data.status !== 'booking_running' && data.code !== 'WEBTRAC_BOOKING_RUNNING') {
+          return { ok: res.ok, data };
+        }
       }
-    }
-
-    function timeToWebtracSeconds(timeHHMM) {
-      const [h, m] = String(timeHHMM || '').split(':').map(Number);
-      if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
-      return (h * 60 + m) * 60;
-    }
-
-    function expandedSelectionUrls(payload) {
-      const expectedBlocks = Math.max(1, Math.round((payload.duration || 60) / 30));
-      const urls = (payload.webtracUpdateSelectionUrls || [])
-        .map(safeWebtracUrl)
-        .filter(Boolean);
-      const unique = [];
-      urls.forEach(url => {
-        if (!unique.includes(url)) unique.push(url);
-      });
-      if (!unique.length) return [];
-      if (unique.length >= expectedBlocks) return unique.slice(0, expectedBlocks);
-
-      const first = new URL(unique[0]);
-      const firstStart = timeToWebtracSeconds(payload.start);
-      if (firstStart == null) return unique;
-      const generated = [];
-      for (let i = 0; i < expectedBlocks; i += 1) {
-        const url = new URL(first.toString());
-        url.searchParams.set('GlobalSalesArea_FRHeadCount', String(BOOKING_HEADCOUNT));
-        url.searchParams.set('GlobalSalesArea_FRItemBeginDate', payload.dateWebtrac);
-        url.searchParams.set('GlobalSalesArea_FRItemEndDate', payload.dateWebtrac);
-        url.searchParams.set('GlobalSalesArea_FRItemBeginTime', String(firstStart + i * 1800));
-        url.searchParams.set('GlobalSalesArea_FRItemEndTime', String(firstStart + (i + 1) * 1800));
-        generated.push(url.toString());
-      }
-      return generated;
-    }
-
-    function webtracHandoffPlan(payload) {
-      const searchUrl = safeWebtracUrl(payload.webtracSearchUrl) || webtracUrl(payload.courtCode);
-      const selectionUrls = expandedSelectionUrls(payload);
       return {
-        primaryUrl: searchUrl,
-        searchUrl,
-        selectionUrls,
-        sequenceUrls: selectionUrls.length ? selectionUrls.concat(searchUrl) : [searchUrl],
-        selectionCount: selectionUrls.length,
+        ok: false,
+        data: {
+          status: 'worker_timeout',
+          code: 'WEBTRAC_BOOKING_STATUS_TIMEOUT',
+          message: lastData?.message || 'Courtside is still waiting on WebTrac. Try checking again in a moment.',
+        },
       };
     }
 
-    function writeWebtracLoadingPage(opened, payload, plan) {
-      try {
-        const label = payload.courtUnitDisplayName
-          ? `${payload.courtName} ${payload.courtUnitDisplayName}`
-          : payload.courtName;
-        opened.document.open();
-        opened.document.write(`<!doctype html>
-          <html><head><title>Opening WebTrac</title>
-          <meta name="viewport" content="width=device-width,initial-scale=1">
-          <style>
-            body{margin:0;min-height:100vh;display:grid;place-items:center;background:#071015;color:#f4f7fb;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-            main{max-width:520px;padding:32px;text-align:center}
-            h1{font-size:24px;margin:0 0 12px}
-            p{color:#a7b1c2;font-size:17px;line-height:1.45;margin:0}
-          </style></head><body><main>
-            <h1>Loading your WebTrac selection</h1>
-            <p>${escapeHtml(label)} · ${escapeHtml(formatBookingWindow())}</p>
-            <p>${plan.selectionCount ? 'Selecting your exact time blocks, then opening the normal WebTrac page.' : 'Opening the matching WebTrac search page.'}</p>
-          </main></body></html>`);
-        opened.document.close();
-      } catch (e) {}
-    }
-
-    function navigateOpenedTab(opened, url) {
-      try {
-        opened.location.href = url;
-      } catch (e) {}
-    }
-
-    function openWebtracHandoff(payload) {
-      const plan = webtracHandoffPlan(payload);
-      const opened = window.open('', '_blank');
-      if (!opened) return { opened: false, plan };
-      writeWebtracLoadingPage(opened, payload, plan);
-      try { opened.blur(); window.focus(); } catch (e) {}
-      const startDelay = plan.selectionCount ? 550 : 250;
-      plan.sequenceUrls.forEach((url, index) => {
-        const delay = startDelay + WEBTRAC_HANDOFF_STEP_MS * index;
-        window.setTimeout(() => navigateOpenedTab(opened, url), delay);
-      });
-      window.setTimeout(() => {
-        try {
-          opened.focus();
-          opened.opener = null;
-        } catch (e) {}
-      }, startDelay + WEBTRAC_HANDOFF_STEP_MS * Math.max(1, plan.sequenceUrls.length));
-      return { opened: true, plan };
-    }
-
-    function setManualWebtracFallback(el, payload) {
-      if (!el) return null;
-      const plan = webtracHandoffPlan(payload);
-      el.href = plan.primaryUrl;
-      el.hidden = false;
-      el.textContent = plan.selectionCount
-        ? 'Open selected WebTrac blocks →'
-        : 'Open WebTrac in a new tab →';
-      return plan;
-    }
-
     async function submitInAppBooking(court, statusEl, manualFallbackEl, buttonEl) {
-      const payload = buildBookingPayload(court);
-      lastWebtracHandoffPayload = payload;
+      const payload = {
+        ...buildBookingPayload(court),
+        selectionOnly: true,
+        reserveMode: 'select_only',
+      };
       const courtLabel = payload.courtUnitDisplayName
         ? `${payload.courtName} ${payload.courtUnitDisplayName}`
         : payload.courtName;
-      const fallbackPlan = setManualWebtracFallback(manualFallbackEl, payload);
+      if (manualFallbackEl) {
+        manualFallbackEl.href = payload.webtracSearchUrl;
+        manualFallbackEl.hidden = true;
+        manualFallbackEl.textContent = 'Continue in WebTrac →';
+      }
       if (buttonEl) {
         buttonEl.disabled = true;
-        buttonEl.textContent = 'Opening WebTrac...';
+        buttonEl.textContent = 'Selecting slot...';
       }
-      rememberLastCourt(court.id);
-      track('manual_webtrac_opened', {
-        sport: selectedSport,
-        court: court.id,
-        duration: bookingPrefs.duration,
-        date: bookingPrefs.date,
-        time: bookingPrefs.time,
-        source: 'production-reserve',
-      });
-      const handoff = openWebtracHandoff(payload);
-      const plan = handoff.plan || fallbackPlan || webtracHandoffPlan(payload);
-      if (buttonEl) {
-        buttonEl.disabled = false;
-        buttonEl.textContent = 'Open WebTrac again';
+      const progress = startBookingProgressMessages(statusEl);
+      let keepSelectedState = false;
+
+      try {
+        const res = await fetch('/.netlify/functions/reserve', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        let data = await res.json().catch(() => ({}));
+        let responseOk = res.ok;
+        if (responseOk && data.status === 'booking_started' && data.jobId) {
+          const polled = await pollBookingJob(data.jobId);
+          data = polled.data;
+          responseOk = polled.ok;
+        }
+
+        progress.stop();
+        if (responseOk && ['slot_selected', 'qa_accepted', 'dry_run_ready'].includes(data.status)) {
+          rememberLastCourt(court.id);
+          setManualWebtracFallback(manualFallbackEl, payload);
+          track('webtrac_slot_selected', {
+            sport: selectedSport,
+            court: court.id,
+            duration: bookingPrefs.duration,
+            date: bookingPrefs.date,
+            time: bookingPrefs.time,
+            status: data.status,
+          });
+          keepSelectedState = data.status === 'slot_selected';
+          setReserveStatus(
+            statusEl,
+            data.status === 'slot_selected'
+              ? `Selected ${courtLabel} for ${formatBookingWindow()} in WebTrac. Continue in WebTrac to log in, add the selection to your cart, and check out.`
+              : data.message || 'Booking request accepted for testing. No WebTrac slot was changed.',
+            'ok'
+          );
+          if (buttonEl) {
+            buttonEl.disabled = keepSelectedState;
+            buttonEl.textContent = keepSelectedState ? 'Slot selected' : 'Try again';
+          }
+          return;
+        }
+
+        setManualWebtracFallback(manualFallbackEl, payload);
+        const message = data.message || 'Could not select that slot in WebTrac. Continue manually or try another court/time.';
+        setReserveStatus(statusEl, message, 'warn');
+      } catch (e) {
+        progress.stop();
+        setManualWebtracFallback(manualFallbackEl, payload);
+        setReserveStatus(statusEl, 'Booking service is not reachable. Continue in WebTrac manually or try again.', 'warn');
+      } finally {
+        progress.stop();
+        if (buttonEl && !keepSelectedState) {
+          buttonEl.disabled = false;
+          buttonEl.textContent = 'Try again';
+        }
       }
-      setReserveStatus(
-        statusEl,
-        handoff.opened
-          ? (plan.selectionCount
-              ? `Opened WebTrac in a new tab and loaded ${plan.selectionCount} selected time blocks for ${courtLabel} on ${formatBookingWindow()}. Complete final checkout through Arlington.`
-              : `Opened Arlington WebTrac in a new tab for ${courtLabel} on ${formatBookingWindow()}. Complete final checkout through Arlington.`)
-          : `Your browser blocked the new tab. Use the WebTrac button below for ${courtLabel} on ${formatBookingWindow()}.`,
-        handoff.opened ? 'ok' : 'warn'
-      );
     }
 
     // -------------------- Views --------------------
@@ -3332,21 +3285,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         const manualFallbackEl = document.getElementById('manualWebtracBtn');
         const reserveBtn = document.getElementById('reserveBtn');
         if (manualFallbackEl) {
-          manualFallbackEl.addEventListener('click', (event) => {
-            if (!lastWebtracHandoffPayload) return;
-            event.preventDefault();
-            const handoff = openWebtracHandoff(lastWebtracHandoffPayload);
-            const payload = lastWebtracHandoffPayload;
-            const courtLabel = payload.courtUnitDisplayName
-              ? `${payload.courtName} ${payload.courtUnitDisplayName}`
-              : payload.courtName;
-            setReserveStatus(
-              reserveStatusEl,
-              handoff.opened
-                ? `Opened WebTrac in a new tab for ${courtLabel} on ${formatBookingWindow()}.`
-                : 'Your browser still blocked the new tab. Try allowing popups for Courtside, then tap again.',
-              handoff.opened ? 'ok' : 'warn'
-            );
+          manualFallbackEl.addEventListener('click', () => {
+            track('manual_webtrac_continue', {
+              sport: selectedSport,
+              court: court.id,
+              duration: bookingPrefs.duration,
+              date: bookingPrefs.date,
+              time: bookingPrefs.time,
+            });
           });
         }
 
@@ -3354,7 +3300,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           if (rangeEl) rangeEl.textContent = formatBookingWindow();
         };
         const resetReserveFeedback = () => {
-          lastWebtracHandoffPayload = null;
           if (reserveStatusEl) reserveStatusEl.hidden = true;
           if (reserveBtn) {
             reserveBtn.hidden = false;
