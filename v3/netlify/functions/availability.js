@@ -45,11 +45,16 @@ exports.handler = async (event) => {
   wtUrl.searchParams.set('search', 'yes');
 
   try {
-    const res = await fetchWithScraperFallback(apiKey, wtUrl);
-    if (!res.ok) {
-      return jsonResponse(502, { error: `Scraper returned ${res.status}` });
+    const scrape = await fetchWithScraperFallback(apiKey, wtUrl);
+    if (!scrape.res || !scrape.res.ok) {
+      const status = scrape.res ? scrape.res.status : 502;
+      return jsonResponse(502, {
+        error: `Scraper returned ${status}`,
+        scraperAttempts: scrape.attempts,
+        version: 'availability-scraper-fallback-v2',
+      });
     }
-    const html = await res.text();
+    const html = await scrape.res.text();
     const availability = parseAvailability(html);
     return jsonResponse(200, { ...availability, fetchedAt: Date.now() }, {
       // CDN-cache per court+date for 60s — many users on same combo hit cache, not scraper.
@@ -63,22 +68,27 @@ exports.handler = async (event) => {
 async function fetchWithScraperFallback(apiKey, wtUrl) {
   const attempts = [
     // Cheapest path first. Some cached/low-risk WebTrac pages still work here.
-    { country_code: 'us' },
+    { label: 'basic-us', params: { country_code: 'us' } },
+    // Try rendered browsing before premium IPs; it costs less than premium+render
+    // and can handle lightweight bot-wall/script changes.
+    { label: 'render-us', params: { country_code: 'us', render: 'true' } },
     // WebTrac often blocks datacenter proxy IPs; US premium proxies fix that
     // without paying for JS rendering on every availability check.
-    { country_code: 'us', premium: 'true' },
+    { label: 'premium-us', params: { country_code: 'us', premium: 'true' } },
     // Last resort for bot-wall changes. This is expensive, so keep it last.
-    { country_code: 'us', premium: 'true', render: 'true' },
+    { label: 'premium-render-us', params: { country_code: 'us', premium: 'true', render: 'true' } },
   ];
 
+  const seen = [];
   let lastRes = null;
-  for (const options of attempts) {
-    const res = await fetch(scraperApiUrl(apiKey, wtUrl, options));
+  for (const attempt of attempts) {
+    const res = await fetch(scraperApiUrl(apiKey, wtUrl, attempt.params));
+    seen.push({ label: attempt.label, status: res.status });
     lastRes = res;
-    if (res.ok) return res;
-    if (![401, 403, 429, 500, 502, 503, 504].includes(res.status)) return res;
+    if (res.ok) return { res, attempts: seen };
+    if (![401, 403, 429, 500, 502, 503, 504].includes(res.status)) return { res, attempts: seen };
   }
-  return lastRes;
+  return { res: lastRes, attempts: seen };
 }
 
 function scraperApiUrl(apiKey, wtUrl, options = {}) {
