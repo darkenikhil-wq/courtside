@@ -4,12 +4,14 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { config, assertRuntimeConfig, paymentEnvStatus, requiredEnvStatus } from './config.js';
 import { validateBookingRequest } from './validation.js';
-import { finalizeWebtracCheckout, inspectCheckoutFlow, reserveWithWebtrac } from './webtrac.js';
+import { finalizeWebtracCheckout, inspectCheckoutFlow, reserveWithWebtrac, scrapeAvailabilityWithWebtrac } from './webtrac.js';
 
 const app = express();
 const reserveJobs = new Map();
 const checkoutJobs = new Map();
+const availabilityCache = new Map();
 const RESERVE_JOB_TTL_MS = 30 * 60 * 1000;
+const AVAILABILITY_TTL_MS = 60 * 1000;
 const RESERVE_JOB_STORE_DIR = config.reserveJobStoreDir;
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -43,6 +45,36 @@ app.get('/health', (req, res) => {
     paymentMissingEnv: paymentMissing,
     workerBuild: 'verify-payment-fields-v1',
   });
+});
+
+app.get('/availability', async (req, res) => {
+  const validation = validateAvailabilityQuery(req.query || {});
+  if (!validation.ok) {
+    return res.status(400).json({
+      status: 'rejected',
+      code: validation.code,
+      message: validation.message,
+    });
+  }
+
+  const cacheKey = `${validation.payload.sportType}|${validation.payload.courtCode}|${validation.payload.dateWebtrac}`;
+  const cached = availabilityCache.get(cacheKey);
+  if (cached && Date.now() - cached.cachedAt < AVAILABILITY_TTL_MS) {
+    return res.json({
+      ...cached.payload,
+      cached: true,
+      cachedAt: cached.cachedAt,
+    });
+  }
+
+  try {
+    const result = await scrapeAvailabilityWithWebtrac(validation.payload);
+    availabilityCache.set(cacheKey, { payload: result, cachedAt: Date.now() });
+    cleanupAvailabilityCache();
+    return res.json(result);
+  } catch (e) {
+    res.status(e.code === 'MISSING_ENV' ? 500 : 502).json(errorPayload(e, 'WEBTRAC_AVAILABILITY_ERROR'));
+  }
 });
 
 app.post('/reserve', async (req, res) => {
@@ -490,6 +522,13 @@ function cleanupCheckoutJobs() {
   cleanupReserveJobFiles(cutoff);
 }
 
+function cleanupAvailabilityCache() {
+  const cutoff = Date.now() - AVAILABILITY_TTL_MS;
+  for (const [key, value] of availabilityCache) {
+    if (!value || value.cachedAt < cutoff) availabilityCache.delete(key);
+  }
+}
+
 async function cleanupReserveJobFiles(cutoff) {
   try {
     const entries = await fs.readdir(RESERVE_JOB_STORE_DIR, { withFileTypes: true });
@@ -513,6 +552,32 @@ function reserveStatusCode(status) {
   return status === 'slot_selection_uncertain' || status === 'cart_update_uncertain' ? 502 : 200;
 }
 
+function validateAvailabilityQuery(query) {
+  const courtCode = String(query.court || query.courtCode || '').toUpperCase().trim();
+  const sportType = String(query.sport || query.sportType || 'TENNIS').toUpperCase().trim();
+  const dateWebtrac = String(query.date || query.dateWebtrac || '').trim();
+
+  if (!courtCode || !/^[A-Z0-9-]{2,12}$/.test(courtCode)) {
+    return fail('BAD_COURT', 'Court is not configured for availability.');
+  }
+  if (!['TENNIS', 'PICKLE', 'VBALL'].includes(sportType)) {
+    return fail('BAD_SPORT', 'Sport is not supported.');
+  }
+  if (!/^\d{2}\/\d{2}\/\d{4}$/.test(dateWebtrac)) {
+    return fail('BAD_DATE', 'Date must be MM/DD/YYYY.');
+  }
+
+  return {
+    ok: true,
+    payload: {
+      courtCode,
+      sportType,
+      dateWebtrac,
+      headcount: 2,
+    },
+  };
+}
+
 function errorPayload(e, fallbackCode) {
   return {
     status: 'worker_error',
@@ -521,6 +586,10 @@ function errorPayload(e, fallbackCode) {
     missing: e.missing,
     details: e.details,
   };
+}
+
+function fail(code, message) {
+  return { ok: false, code, message };
 }
 
 function isAuthorized(req) {

@@ -1943,6 +1943,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     // Cached in-memory + sessionStorage, keyed by court|date|sport, for 60s.
     const AVAILABILITY_TTL_MS = 60 * 1000;
     const AVAILABILITY_PARSER_VERSION = 'unit-v2';
+    const AVAILABILITY_WORKER_ENDPOINT = 'https://courtside-booking-worker.onrender.com/availability';
     const availabilityMemCache = new Map();
 
     function availabilityCacheGet(key) {
@@ -1993,46 +1994,59 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const key = `${AVAILABILITY_PARSER_VERSION}|${courtCode}|${dateMMDDYYYY}|${sportType}`;
       const cached = availabilityCacheGet(key);
       if (cached) return cached;
-      const url = '/.netlify/functions/availability'
-        + `?court=${encodeURIComponent(courtCode)}`
+
+      const query = `?court=${encodeURIComponent(courtCode)}`
         + `&date=${encodeURIComponent(dateMMDDYYYY)}`
         + `&sport=${encodeURIComponent(sportType)}`
         + `&parser=${encodeURIComponent(AVAILABILITY_PARSER_VERSION)}`;
-      console.log('[availability] fetching', url);
+      const attempts = [
+        { label: 'worker', url: AVAILABILITY_WORKER_ENDPOINT + query, timeoutMs: 60000 },
+        { label: 'netlify', url: '/.netlify/functions/availability' + query, timeoutMs: 20000 },
+      ];
+      let lastError = null;
+      for (const attempt of attempts) {
+        try {
+          console.log('[availability] fetching', attempt.label, attempt.url);
+          const data = await fetchAvailabilityJson(attempt.url, attempt.timeoutMs);
+          const availability = normalizeAvailabilityPayload(data);
+          console.log('[availability] got', availability.slots.length, 'aggregate slots',
+                      `(${availability.slots.filter(s=>!s.available).length} taken)`,
+                      'court units:', availability.courts.length,
+                      'via', attempt.label);
+          availabilityCacheSet(key, availability);
+          return availability;
+        } catch (e) {
+          lastError = e;
+          console.warn('[availability] failed:', attempt.label, e && e.message || e, e);
+        }
+      }
+
+      let message = lastError && lastError.message;
+      try {
+        if (lastError && lastError.body) {
+          const parsed = JSON.parse(lastError.body);
+          message = parsed.error || parsed.message || message;
+        }
+      } catch (parseErr) {}
+      return { __error: true, status: lastError && lastError.status, message };
+    }
+
+    async function fetchAvailabilityJson(url, timeoutMs) {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 15000);
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
       try {
         const res = await fetch(url, { signal: controller.signal });
-        clearTimeout(timer);
         if (!res.ok) {
-          // Try to extract the function's error body for a better message.
           let bodyText = '';
           try { bodyText = await res.text(); } catch (e) {}
           const err = new Error('HTTP ' + res.status);
           err.status = res.status;
           err.body = bodyText;
-          console.warn('[availability] non-OK response', res.status, bodyText);
           throw err;
         }
-        const data = await res.json();
-        const availability = normalizeAvailabilityPayload(data);
-        console.log('[availability] got', availability.slots.length, 'aggregate slots',
-                    `(${availability.slots.filter(s=>!s.available).length} taken)`,
-                    'court units:', availability.courts.length);
-        availabilityCacheSet(key, availability);
-        return availability;
-      } catch (e) {
+        return await res.json();
+      } finally {
         clearTimeout(timer);
-        console.warn('[availability] failed:', e && e.message || e, e);
-        let message = e && e.message;
-        try {
-          if (e && e.body) {
-            const parsed = JSON.parse(e.body);
-            message = parsed.error || parsed.message || message;
-          }
-        } catch (parseErr) {}
-        // Surface the error so refreshAvailability can show a specific message.
-        return { __error: true, status: e && e.status, message };
       }
     }
 
