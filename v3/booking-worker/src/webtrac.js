@@ -91,6 +91,48 @@ export async function reserveWithWebtrac(payload) {
   }
 }
 
+export async function scrapeAvailabilityWithWebtrac(payload) {
+  const { browser, context, page } = await createBrowserSession();
+
+  try {
+    const searchUrl = buildSearchUrl({
+      courtCode: payload.courtCode,
+      sportType: payload.sportType || 'TENNIS',
+      dateWebtrac: payload.dateWebtrac,
+      headcount: payload.headcount || 2,
+    });
+    await page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: 45000 });
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+
+    const title = await page.title().catch(() => '');
+    const bodyText = await page.locator('body').innerText({ timeout: 5000 }).catch(() => '');
+    if (isCloudflareBlocked(bodyText, title)) {
+      throw codedError(
+        'WEBTRAC_ACCESS_BLOCKED',
+        'WebTrac blocked the availability worker before the court results loaded.'
+      );
+    }
+
+    const html = await page.content();
+    const availability = parseAvailabilityHtml(html);
+    return {
+      status: 'availability_ready',
+      code: 'WEBTRAC_AVAILABILITY_READY',
+      ...availability,
+      fetchedAt: Date.now(),
+      webtracSearchUrl: searchUrl,
+      page: {
+        title,
+        url: page.url(),
+      },
+    };
+  } finally {
+    await context.close().catch(() => {});
+    await browser.close().catch(() => {});
+    await resetArtifactDir().catch(() => {});
+  }
+}
+
 export async function inspectCheckoutFlow(options = {}) {
   const { browser, context, page } = await createBrowserSession();
 
@@ -2017,6 +2059,188 @@ function normalizeSelectionUrls(payload) {
     return payload.webtracUpdateSelectionUrls.filter(Boolean);
   }
   return payload.webtracUpdateSelectionUrl ? [payload.webtracUpdateSelectionUrl] : [];
+}
+
+function parseAvailabilityHtml(html) {
+  const aggregateSlotMap = new Map();
+  const courtMap = new Map();
+  const unitLabels = new Map();
+  let currentCourt = null;
+
+  const linkRe = /<([a-z][\w:-]*)\s+([^>]*?cart-button[^>]*?)>([\s\S]*?)<\/\1>/gi;
+  let m;
+  while ((m = linkRe.exec(html)) !== null) {
+    const attrs = m[2];
+    const inner = m[3];
+
+    if (/cart-button--state-label/.test(attrs)) {
+      const label = cleanAvailabilityText(inner) || cleanAvailabilityText(attributeValue(attrs, 'title')) || `Court ${courtMap.size + 1}`;
+      currentCourt = isMeaningfulAvailabilityCourtLabel(label) ? ensureAvailabilityCourt(courtMap, label) : null;
+      continue;
+    }
+    if (!/cart-button--state-block/.test(attrs)) continue;
+
+    const t = inner.match(/(\d{1,2}):(\d{2})\s*([ap]m)\s*-\s*(\d{1,2}):(\d{2})\s*([ap]m)/i);
+    if (!t) continue;
+
+    const isUnavailable =
+      /data-tooltip\s*=\s*"Unavailable"/i.test(attrs) ||
+      /\bUnavailable\b/i.test(inner) ||
+      /\berror\b/.test(attrs);
+    const isAvailable = !isUnavailable;
+
+    const href = decodeAvailabilityEntities(attributeValue(attrs, 'href'));
+    const unitId = webtracFacilityUnitIdFromHref(href);
+    let bookingUrl = null;
+    if (isAvailable && href && href !== '#' && /UpdateSelection/i.test(href)) bookingUrl = href;
+
+    const startMins = toAvailabilityMins(parseInt(t[1], 10), parseInt(t[2], 10), t[3]);
+    const endMins = toAvailabilityMins(parseInt(t[4], 10), parseInt(t[5], 10), t[6]);
+    if (!Number.isFinite(startMins) || !Number.isFinite(endMins) || endMins <= startMins) continue;
+
+    const unitCourt = currentCourt || (unitId ? ensureAvailabilityCourtForUnit(courtMap, unitLabels, unitId) : null);
+    let unitBookingUrl = bookingUrl;
+    for (let mins = startMins; mins < endMins; mins += 30) {
+      const key = minsToAvailabilityHHMM(mins);
+      if (unitCourt) mergeAvailabilitySlot(unitCourt.slotMap, key, isAvailable, unitBookingUrl);
+      mergeAvailabilitySlot(aggregateSlotMap, key, isAvailable, unitBookingUrl);
+      unitBookingUrl = null;
+    }
+  }
+
+  const courts = Array.from(courtMap.values())
+    .map((court) => ({
+      id: court.id,
+      label: court.label,
+      webtracFacilityId: court.webtracFacilityId || null,
+      slots: availabilitySlotMapToSlots(court.slotMap),
+    }))
+    .filter((court) => court.slots.length)
+    .sort((a, b) => availabilityCourtSortLabel(a.label).localeCompare(availabilityCourtSortLabel(b.label), undefined, { numeric: true }));
+
+  return {
+    slots: availabilitySlotMapToSlots(aggregateSlotMap),
+    courts,
+    courtCount: courts.length,
+  };
+}
+
+function mergeAvailabilitySlot(slotMap, key, isAvailable, bookingUrl) {
+  const prev = slotMap.get(key);
+  if (prev === undefined) {
+    slotMap.set(key, { available: isAvailable, bookingUrl });
+  } else if (isAvailable && !prev.available) {
+    slotMap.set(key, { available: true, bookingUrl });
+  } else if (isAvailable && prev.available && !prev.bookingUrl && bookingUrl) {
+    slotMap.set(key, { available: true, bookingUrl });
+  }
+}
+
+function availabilitySlotMapToSlots(slotMap) {
+  return Array.from(slotMap.entries())
+    .map(([start, info]) => ({ start, available: info.available, bookingUrl: info.bookingUrl || null }))
+    .sort((a, b) => a.start.localeCompare(b.start));
+}
+
+function ensureAvailabilityCourt(courtMap, label) {
+  const normalized = normalizeAvailabilityCourtLabel(label);
+  const id = slugifyAvailabilityCourt(normalized || `court-${courtMap.size + 1}`);
+  if (!courtMap.has(id)) {
+    courtMap.set(id, {
+      id,
+      label: normalized || `Court ${courtMap.size + 1}`,
+      slotMap: new Map(),
+    });
+  }
+  return courtMap.get(id);
+}
+
+function ensureAvailabilityCourtForUnit(courtMap, unitLabels, unitId) {
+  const key = String(unitId || '').trim();
+  if (!key) return null;
+  if (!unitLabels.has(key)) unitLabels.set(key, `Court ${unitLabels.size + 1}`);
+  const label = unitLabels.get(key);
+  const id = `unit-${slugifyAvailabilityCourt(key)}`;
+  if (!courtMap.has(id)) {
+    courtMap.set(id, {
+      id,
+      label,
+      webtracFacilityId: key,
+      slotMap: new Map(),
+    });
+  }
+  return courtMap.get(id);
+}
+
+function normalizeAvailabilityCourtLabel(label) {
+  return cleanAvailabilityText(label)
+    .replace(/\bFacility Reservation\b/gi, '')
+    .replace(/\bBook Now\b/gi, '')
+    .replace(/\bUnavailable\b/gi, '')
+    .replace(/^[\s:.|/\\-]+|[\s:.|/\\-]+$/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function isMeaningfulAvailabilityCourtLabel(label) {
+  const normalized = normalizeAvailabilityCourtLabel(label);
+  return /[a-z0-9]/i.test(normalized) && !/^court$/i.test(normalized);
+}
+
+function availabilityCourtSortLabel(label) {
+  return String(label || '').replace(/^.*?(\d+)$/, 'Court $1');
+}
+
+function slugifyAvailabilityCourt(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/&[a-z0-9#]+;/gi, ' ')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'court';
+}
+
+function cleanAvailabilityText(value) {
+  return decodeAvailabilityEntities(String(value || '')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim());
+}
+
+function attributeValue(attrs, name) {
+  const re = new RegExp(`${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`, 'i');
+  const match = attrs.match(re);
+  return match ? (match[1] || match[2] || match[3] || '') : '';
+}
+
+function decodeAvailabilityEntities(value) {
+  return String(value || '')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#x2F;/g, '/');
+}
+
+function toAvailabilityMins(hour, minute, ampm) {
+  let h = hour;
+  const ap = String(ampm || '').toLowerCase();
+  if (ap === 'am') h = h === 12 ? 0 : h;
+  if (ap === 'pm') h = h === 12 ? 12 : h + 12;
+  return h * 60 + minute;
+}
+
+function minsToAvailabilityHHMM(mins) {
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+function webtracFacilityUnitIdFromHref(href) {
+  const match = String(href || '').match(/(?:^|[?&])(?:frfacility|facility|item|key|id)=([^&]+)/i);
+  return match ? decodeURIComponent(match[1].replace(/\+/g, ' ')) : '';
 }
 
 function hhmmToMins(hhmm) {
