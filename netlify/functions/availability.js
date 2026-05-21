@@ -45,13 +45,8 @@ exports.handler = async (event) => {
   wtUrl.searchParams.set('module', 'FR');
   wtUrl.searchParams.set('search', 'yes');
 
-  const scraperUrl = 'https://api.scraperapi.com/?' + new URLSearchParams({
-    api_key: apiKey,
-    url: wtUrl.toString(),
-  }).toString();
-
   try {
-    const res = await fetch(scraperUrl);
+    const res = await fetchWithScraperFallback(apiKey, wtUrl);
     if (!res.ok) {
       return jsonResponse(502, { error: `Scraper returned ${res.status}` });
     }
@@ -65,6 +60,35 @@ exports.handler = async (event) => {
     return jsonResponse(500, { error: String(e && e.message || e) });
   }
 };
+
+async function fetchWithScraperFallback(apiKey, wtUrl) {
+  const attempts = [
+    // Cheapest path first. Some cached/low-risk WebTrac pages still work here.
+    { country_code: 'us' },
+    // WebTrac often blocks datacenter proxy IPs; US premium proxies fix that
+    // without paying for JS rendering on every availability check.
+    { country_code: 'us', premium: 'true' },
+    // Last resort for bot-wall changes. This is expensive, so keep it last.
+    { country_code: 'us', premium: 'true', render: 'true' },
+  ];
+
+  let lastRes = null;
+  for (const options of attempts) {
+    const res = await fetch(scraperApiUrl(apiKey, wtUrl, options));
+    lastRes = res;
+    if (res.ok) return res;
+    if (![401, 403, 429, 500, 502, 503, 504].includes(res.status)) return res;
+  }
+  return lastRes;
+}
+
+function scraperApiUrl(apiKey, wtUrl, options = {}) {
+  return 'https://api.scraperapi.com/?' + new URLSearchParams({
+    api_key: apiKey,
+    url: wtUrl.toString(),
+    ...options,
+  }).toString();
+}
 
 // WebTrac slot markup observed live:
 //
