@@ -937,6 +937,63 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       gap: 10px;
       margin-top: 14px;
     }
+    .home-actions {
+      display: grid;
+      gap: 10px;
+      margin: 18px 0 14px;
+    }
+    .home-primary {
+      min-height: 64px;
+      display: grid;
+      place-items: center;
+      line-height: 1.15;
+    }
+    .home-primary span {
+      display: block;
+      font-size: 12px;
+      font-weight: 750;
+      letter-spacing: 0.11em;
+      text-transform: uppercase;
+      opacity: 0.72;
+      margin-bottom: 4px;
+    }
+    .home-secondary-note {
+      margin: 8px 0 10px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .home-mini-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .home-mini-grid .btn-sport {
+      min-height: 54px;
+      padding: 10px 12px;
+      border-radius: 12px;
+    }
+    .play-date-panel {
+      margin: 0 0 14px;
+      padding: 13px 14px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--card-elev);
+      text-align: left;
+    }
+    .play-date-row {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .play-date-summary {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
     .search-summary {
       margin: 0 0 14px;
       padding: 11px 12px;
@@ -1032,6 +1089,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       border-color: rgba(var(--accent-rgb), 0.45);
       background: rgba(var(--accent-rgb), 0.10);
       color: var(--accent);
+    }
+    .result-status.checking {
+      border-color: rgba(var(--accent-rgb), 0.26);
+      background: rgba(var(--accent-rgb), 0.06);
+      color: var(--muted);
     }
     .result-status.full {
       border-color: rgba(248, 113, 113, 0.32);
@@ -1591,8 +1653,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     // 90 minutes, at least 24 hours ahead, no more than 14 days ahead.
     const BOOKING_MIN_DAYS_AHEAD = 1;
     const BOOKING_MAX_DAYS_AHEAD = 14;
+    const PLAY_NOW_DURATION = 60;
 
     const bookingPrefs = { date: null, time: null, duration: 60 };
+    const playPrefs = { date: null };
     const selectedCourtUnits = new Map();
 
     function formatLocalDate(d) {
@@ -1633,6 +1697,56 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const d = new Date();
       d.setDate(d.getDate() + BOOKING_MAX_DAYS_AHEAD);
       return formatLocalDate(d);
+    }
+    function todayISO() {
+      return formatLocalDate(new Date());
+    }
+    function playMaxDateISO() {
+      return maxBookingDateISO();
+    }
+    function isTodayISO(iso) {
+      return iso === todayISO();
+    }
+    function dateLabelShort(iso) {
+      const d = parseISODate(iso);
+      const now = new Date();
+      const tomorrow = new Date(now);
+      tomorrow.setDate(now.getDate() + 1);
+      if (iso === formatLocalDate(now)) return 'Today';
+      if (iso === formatLocalDate(tomorrow)) return 'Tomorrow';
+      return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()];
+    }
+    function playDateOptions() {
+      const today = new Date();
+      const out = [];
+      for (let offset = 0; offset <= BOOKING_MAX_DAYS_AHEAD; offset += 1) {
+        const d = new Date(today);
+        d.setDate(today.getDate() + offset);
+        const iso = formatLocalDate(d);
+        out.push({
+          iso,
+          day: dateLabelShort(iso),
+          date: `${d.getMonth() + 1}/${d.getDate()}`,
+        });
+      }
+      return out;
+    }
+    function playDateChipsHtml() {
+      return `
+        <div class="date-chip-row" aria-label="Dates to check for open courts">
+          ${playDateOptions().map(item => `
+            <button type="button" class="date-chip${item.iso === playPrefs.date ? ' active' : ''}" data-play-date="${item.iso}" aria-pressed="${item.iso === playPrefs.date}">
+              ${item.day}<span>${item.date}</span>
+            </button>
+          `).join('')}
+        </div>`;
+    }
+    function syncPlayDateChips() {
+      card.querySelectorAll('.date-chip[data-play-date]').forEach(btn => {
+        const active = btn.dataset.playDate === playPrefs.date;
+        btn.classList.toggle('active', active);
+        btn.setAttribute('aria-pressed', String(active));
+      });
     }
     function weekDateOptions() {
       const today = new Date();
@@ -1713,6 +1827,59 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     // 9pm close and Arlington's "at least 24 hours ahead" rule.
     function listBookingTimes(durationMins, dateISO = bookingPrefs.date) {
       return listBookingTimesForDate(durationMins, dateISO || defaultBookingDateISO());
+    }
+
+    function roundedCurrentStartMins() {
+      const now = new Date();
+      const mins = now.getHours() * 60 + now.getMinutes();
+      return Math.ceil(mins / 30) * 30;
+    }
+    function listPlayTimesForDate(dateISO = playPrefs.date) {
+      const all = listOperatingTimes(PLAY_NOW_DURATION);
+      if (!isTodayISO(dateISO)) return all;
+      const earliest = Math.max(BOOKING_FIRST_HOUR * 60, roundedCurrentStartMins());
+      return all.filter(t => {
+        const [h, m] = t.value.split(':').map(Number);
+        return h * 60 + m >= earliest;
+      });
+    }
+    function defaultPlayTime24(dateISO = playPrefs.date) {
+      const first = listPlayTimesForDate(dateISO)[0];
+      return first ? first.value : '08:00';
+    }
+    function syncBookingPrefsForPlayDate() {
+      initPlayPrefsIfNeeded();
+      bookingPrefs.date = playPrefs.date;
+      bookingPrefs.duration = PLAY_NOW_DURATION;
+      bookingPrefs.time = defaultPlayTime24(playPrefs.date);
+    }
+    function initPlayPrefsIfNeeded() {
+      if (!playPrefs.date) playPrefs.date = todayISO();
+    }
+    function formatTimeRange(startHHMM, durationMins = PLAY_NOW_DURATION) {
+      const [h, m] = startHHMM.split(':').map(Number);
+      const startMins = h * 60 + m;
+      const endMins = startMins + durationMins;
+      const fmt = (mins) => {
+        const hr = Math.floor(mins / 60);
+        const mn = mins % 60;
+        const ampm = hr >= 12 ? 'PM' : 'AM';
+        const h12 = hr % 12 === 0 ? 12 : hr % 12;
+        return `${h12}:${String(mn).padStart(2, '0')} ${ampm}`;
+      };
+      return `${fmt(startMins)}–${fmt(endMins)}`;
+    }
+    function formatPlayDateLabel() {
+      initPlayPrefsIfNeeded();
+      const d = parseISODate(playPrefs.date);
+      return `${dateLabelShort(playPrefs.date)} ${d.getMonth() + 1}/${d.getDate()}`;
+    }
+    function formatPlayDateSummary() {
+      initPlayPrefsIfNeeded();
+      const times = listPlayTimesForDate(playPrefs.date);
+      if (!times.length) return `${formatPlayDateLabel()} · courts are past normal walk-on hours`;
+      if (isTodayISO(playPrefs.date)) return `${formatPlayDateLabel()} · next hour ${formatTimeRange(times[0].value)}`;
+      return `${formatPlayDateLabel()} · any open 60-minute window`;
     }
 
     // Format the booking range as "9:30 AM – 10:30 AM" for the live label
@@ -1956,6 +2123,99 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         tone: 'warn',
         label: 'Manual check',
         detail: `No detailed availability came back for ${formatBookingWindow()}.`,
+        rankBucket: 2,
+        openCount: 0,
+        totalCount: 0,
+        availabilityRatio: 0,
+      };
+    }
+
+    function playStartValuesForSlots(slots) {
+      const lookup = new Map((slots || []).map(s => [s.start, s]));
+      return listPlayTimesForDate(playPrefs.date).filter(t =>
+        bookingSlotKeys(t.value, PLAY_NOW_DURATION).every(key => {
+          const info = lookup.get(key);
+          return info && info.available !== false;
+        })
+      ).map(t => t.value);
+    }
+
+    function firstPlayStart(openItems) {
+      const starts = openItems.flatMap(item => item.starts || []);
+      const order = new Map(listOperatingTimes(PLAY_NOW_DURATION).map((t, i) => [t.value, i]));
+      return starts.sort((a, b) => (order.get(a) ?? 999) - (order.get(b) ?? 999))[0] || null;
+    }
+
+    function playSummaryDetail(openItems, firstStart, court) {
+      if (!openItems.length) {
+        return isTodayISO(playPrefs.date)
+          ? `No courts open for the next hour`
+          : `No open 60-minute windows on ${formatPlayDateLabel()}`;
+      }
+      const names = openItems
+        .slice(0, 2)
+        .map(item => friendlyCourtUnitLabel(item.unit?.label || item.label, court && court.name))
+        .join(', ');
+      const more = openItems.length > 2 ? ` +${openItems.length - 2} more` : '';
+      if (isTodayISO(playPrefs.date) && firstStart === defaultPlayTime24(playPrefs.date)) {
+        return `${names}${more} open for the next hour`;
+      }
+      return `${names}${more} first open ${firstStart ? formatTimeRange(firstStart) : formatPlayDateLabel()}`;
+    }
+
+    function availabilitySummaryForPlayDate(availability, court) {
+      if (availability && availability.__error) {
+        const configError = /SCRAPER_API_KEY|env var|not configured/i.test(availability.message || '');
+        return {
+          tone: 'warn',
+          label: configError ? 'Setup needed' : 'Check manually',
+          detail: configError
+            ? 'Live availability is not configured on this deployment.'
+            : `Live availability did not load for ${formatPlayDateLabel()}.`,
+          rankBucket: 4,
+          openCount: 0,
+          totalCount: 0,
+          availabilityRatio: 0,
+        };
+      }
+
+      const normalized = normalizeAvailabilityPayload(availability || {});
+      if (normalized.courts.length) {
+        const openItems = normalized.courts
+          .map(unit => ({ unit, starts: playStartValuesForSlots(unit.slots) }))
+          .filter(item => item.starts.length);
+        const firstStart = firstPlayStart(openItems);
+        return {
+          tone: openItems.length ? 'open' : 'full',
+          label: openItems.length ? `${openItems.length}/${normalized.courts.length} open` : 'Full',
+          detail: playSummaryDetail(openItems, firstStart, court),
+          rankBucket: openItems.length ? 0 : 3,
+          openCount: openItems.length,
+          totalCount: normalized.courts.length,
+          availabilityRatio: normalized.courts.length ? openItems.length / normalized.courts.length : 0,
+        };
+      }
+
+      if (normalized.slots.length) {
+        const starts = playStartValuesForSlots(normalized.slots);
+        const open = starts.length > 0;
+        return {
+          tone: open ? 'open' : 'full',
+          label: open ? 'Open' : 'Full',
+          detail: open
+            ? `Open ${formatTimeRange(starts[0])}`
+            : `No open 60-minute windows on ${formatPlayDateLabel()}`,
+          rankBucket: open ? 0 : 3,
+          openCount: open ? 1 : 0,
+          totalCount: 1,
+          availabilityRatio: open ? 1 : 0,
+        };
+      }
+
+      return {
+        tone: 'warn',
+        label: 'Manual check',
+        detail: `No detailed availability came back for ${formatPlayDateLabel()}.`,
         rankBucket: 2,
         openCount: 0,
         totalCount: 0,
@@ -2543,15 +2803,29 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       return { primaryUrl: el.href };
     }
 
+    async function fetchJsonWithTimeout(url, options = {}, timeoutMs = 30000) {
+      const controller = new AbortController();
+      const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const res = await fetch(url, {
+          ...options,
+          signal: controller.signal,
+        });
+        const data = await res.json().catch(() => ({}));
+        return { res, data };
+      } finally {
+        window.clearTimeout(timer);
+      }
+    }
+
     async function pollBookingJob(jobId) {
-      const maxAttempts = 75;
+      const maxAttempts = 30;
       let lastData = null;
       for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
         await new Promise(resolve => setTimeout(resolve, attempt === 0 ? 1200 : 2000));
-        const res = await fetch(`/.netlify/functions/reserve-status?jobId=${encodeURIComponent(jobId)}`, {
+        const { res, data } = await fetchJsonWithTimeout(`/.netlify/functions/reserve-status?jobId=${encodeURIComponent(jobId)}`, {
           headers: { 'Cache-Control': 'no-store' },
-        });
-        const data = await res.json().catch(() => ({}));
+        }, 12000);
         lastData = data;
         if (data.status !== 'booking_running' && data.code !== 'WEBTRAC_BOOKING_RUNNING') {
           return { ok: res.ok, data };
@@ -2576,11 +2850,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const courtLabel = payload.courtUnitDisplayName
         ? `${payload.courtName} ${payload.courtUnitDisplayName}`
         : payload.courtName;
-      if (manualFallbackEl) {
-        manualFallbackEl.href = payload.webtracSearchUrl;
-        manualFallbackEl.hidden = true;
-        manualFallbackEl.textContent = 'Continue in WebTrac →';
-      }
+      setManualWebtracFallback(manualFallbackEl, payload);
+      if (manualFallbackEl) manualFallbackEl.textContent = 'Open WebTrac in a new tab →';
       if (buttonEl) {
         buttonEl.disabled = true;
         buttonEl.textContent = 'Selecting slot...';
@@ -2589,13 +2860,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       let keepSelectedState = false;
 
       try {
-        const res = await fetch('/.netlify/functions/reserve', {
+        const initial = await fetchJsonWithTimeout('/.netlify/functions/reserve', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
-        });
-        let data = await res.json().catch(() => ({}));
-        let responseOk = res.ok;
+        }, 35000);
+        let data = initial.data;
+        let responseOk = initial.res.ok;
         if (responseOk && data.status === 'booking_started' && data.jobId) {
           const polled = await pollBookingJob(data.jobId);
           data = polled.data;
@@ -2635,7 +2906,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       } catch (e) {
         progress.stop();
         setManualWebtracFallback(manualFallbackEl, payload);
-        setReserveStatus(statusEl, 'Booking service is not reachable. Continue in WebTrac manually or try again.', 'warn');
+        const isTimeout = e && e.name === 'AbortError';
+        setReserveStatus(
+          statusEl,
+          isTimeout
+            ? 'WebTrac is taking longer than expected. Open WebTrac in a new tab and complete the booking there.'
+            : 'Booking service is not reachable. Open WebTrac in a new tab or try again.',
+          'warn'
+        );
       } finally {
         progress.stop();
         if (buttonEl && !keepSelectedState) {
@@ -2799,7 +3077,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         }
       }
 
-      // Sport buttons — remembered sport (if any) renders first.
+      // Sport buttons — remembered sport (if any) renders first. These now sit
+      // below the primary "play now" concept as secondary reservation paths.
       const sportOrder = Object.keys(SPORTS);
       if (prefs.sport && SPORTS[prefs.sport]) {
         sportOrder.splice(sportOrder.indexOf(prefs.sport), 1);
@@ -2816,14 +3095,37 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }).join('');
 
       card.innerHTML = `
-        <h1>What are you<br><em>playing?</em></h1>
-        <p class="perm-body">Pick a sport, then choose when you want to play. We'll show courts with availability.</p>
+        <h1>Play tennis<br><em>today?</em></h1>
+        <p class="perm-body">Find the nearest Arlington courts that look open right now, then jump to Arlington when you want the official page.</p>
         ${recentHtml}
-        ${buttons}
+        <div class="home-actions">
+          <button class="btn btn-primary home-primary" id="playNowBtn" type="button">
+            <span>Core MVP</span>
+            Find open courts near me
+          </button>
+          <button class="btn btn-secondary" id="reserveFlowBtn" type="button">Reserve a court</button>
+        </div>
+        <p class="home-secondary-note">Reserve mode still lets you choose a sport, date, time, and court before opening Arlington WebTrac.</p>
+        <div class="home-mini-grid">${buttons}</div>
         <a href="#" class="inline-link" data-action="share" data-cta-id="home-share"
            style="display: inline-block; margin-top: 18px; font-size: 14px;">Share Courtside →</a>
       `;
       resetViewScroll();
+
+      document.getElementById('playNowBtn').addEventListener('click', () => {
+        selectedSport = 'tennis';
+        rememberSport(selectedSport);
+        initPlayPrefsIfNeeded();
+        syncBookingPrefsForPlayDate();
+        track('play_now_started', { sport: selectedSport });
+        requestPlayNowLocation();
+      });
+      document.getElementById('reserveFlowBtn').addEventListener('click', () => {
+        selectedSport = prefs.sport && SPORTS[prefs.sport] ? prefs.sport : 'tennis';
+        rememberSport(selectedSport);
+        track('reserve_flow_started', { sport: selectedSport });
+        renderTimeFirstSearch();
+      });
 
       card.querySelectorAll('button[data-sport]').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -3005,6 +3307,89 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         continueToLocation();
       });
       wireBackLink();
+    }
+
+    function playDatePickerHtml() {
+      initPlayPrefsIfNeeded();
+      return `
+        <div class="play-date-panel">
+          <p class="when-label">Date</p>
+          <div class="play-date-row">
+            <input class="when-input" type="date"
+                   id="playDate" min="${todayISO()}" max="${playMaxDateISO()}"
+                   value="${playPrefs.date}" required>
+          </div>
+          ${playDateChipsHtml()}
+          <p class="play-date-summary" id="playDateSummary">${formatPlayDateSummary()}</p>
+        </div>`;
+    }
+
+    function wirePlayDatePicker(userLoc, errMsg) {
+      const dateEl = document.getElementById('playDate');
+      const rerender = () => {
+        syncBookingPrefsForPlayDate();
+        renderCourtSearchResults(userLoc || null, errMsg || null, { mode: userLoc ? 'play-now' : 'play-manual' });
+      };
+      if (dateEl) {
+        dateEl.addEventListener('change', () => {
+          if (!dateEl.value) return;
+          playPrefs.date = dateEl.value;
+          track('play_date_changed', { date: playPrefs.date });
+          rerender();
+        });
+      }
+      card.querySelectorAll('.date-chip[data-play-date]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          playPrefs.date = btn.dataset.playDate;
+          syncPlayDateChips();
+          track('play_date_changed', { date: playPrefs.date });
+          rerender();
+        });
+      });
+    }
+
+    function renderPlayNowLocating() {
+      initPlayPrefsIfNeeded();
+      syncBookingPrefsForPlayDate();
+      card.innerHTML = `
+        ${sportIconSvg('tennis', true)}
+        <h1>Finding open<br><em>courts</em></h1>
+        <p class="status" id="status">Checking courts near you for ${formatPlayDateSummary()}…</p>
+      `;
+      resetViewScroll();
+    }
+
+    function requestPlayNowLocation() {
+      selectedSport = 'tennis';
+      initPlayPrefsIfNeeded();
+      syncBookingPrefsForPlayDate();
+      renderPlayNowLocating();
+      if (!('geolocation' in navigator)) {
+        renderCourtSearchResults(null, 'Your browser does not support geolocation. Showing Arlington courts instead.', { mode: 'play-manual' });
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        pos => {
+          track('play_now_location_granted', { sport: selectedSport });
+          renderCourtSearchResults(
+            { lat: pos.coords.latitude, lng: pos.coords.longitude },
+            null,
+            { mode: 'play-now' }
+          );
+        },
+        err => {
+          track('play_now_location_failed', { code: err.code, sport: selectedSport });
+          const msg = err.code === 1
+            ? 'Location is blocked. Showing Arlington courts alphabetically instead.'
+            : err.code === 2
+              ? "Couldn't determine your location. Showing Arlington courts instead."
+              : err.code === 3
+                ? 'Location request timed out. Showing Arlington courts instead.'
+                : 'Could not get your location. Showing Arlington courts instead.';
+          renderCourtSearchResults(null, msg, { mode: 'play-manual' });
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+      );
     }
 
     function requestCourtSearchLocation() {
@@ -3416,7 +3801,16 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             date: bookingPrefs.date,
             time: bookingPrefs.time,
           });
-          submitInAppBooking(court, reserveStatusEl, manualFallbackEl, reserveBtn);
+          const payload = buildBookingPayload(court);
+          rememberLastCourt(court.id);
+          setManualWebtracFallback(manualFallbackEl, payload);
+          setReserveStatus(
+            reserveStatusEl,
+            `Opened Arlington WebTrac for ${court.name} on ${formatBookingWindow()}. Finish the official reservation there.`,
+            'ok'
+          );
+          reserveBtn.textContent = 'Open Arlington again';
+          window.open(payload.webtracSearchUrl, '_blank', 'noopener');
         });
         // Track directions clicks too.
         document.getElementById('directionsBtn').addEventListener('click', () => {
@@ -3835,6 +4229,17 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           availabilityRatio: 0,
         };
       }
+      if (options.mode === 'play-now') {
+        return {
+          tone: 'checking',
+          label: 'Checking',
+          detail: `Checking ${formatPlayDateLabel()}`,
+          rankBucket: 1,
+          openCount: 0,
+          totalCount: court.numCourts || 0,
+          availabilityRatio: 0,
+        };
+      }
       return {
         tone: 'checking',
         label: 'Checking',
@@ -3852,7 +4257,17 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     function orderedResultStates(resultStates) {
-      return Array.from(resultStates.values()).sort((a, b) => a.index - b.index);
+      return Array.from(resultStates.values()).sort((a, b) => {
+        if (resultStates && resultStates.rankByAvailability) {
+          const bucketA = Number.isFinite(a.summary?.rankBucket) ? a.summary.rankBucket : 1;
+          const bucketB = Number.isFinite(b.summary?.rankBucket) ? b.summary.rankBucket : 1;
+          if (bucketA !== bucketB) return bucketA - bucketB;
+          const distA = typeof a.court.dist === 'number' ? a.court.dist : Infinity;
+          const distB = typeof b.court.dist === 'number' ? b.court.dist : Infinity;
+          if (distA !== distB) return distA - distB;
+        }
+        return a.index - b.index;
+      });
     }
 
     function normalizeCourtSearch(value) {
@@ -3943,7 +4358,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     async function loadVisibleCourtSearchAvailability(nearby, runId, resultStates) {
-      if (!resultStates || resultStates.mode !== 'nearby') return;
+      if (!resultStates || !['nearby', 'play-now'].includes(resultStates.mode)) return;
       if (!resultStates.loadedCourtIds) resultStates.loadedCourtIds = new Set();
       const queue = visibleResultStates(resultStates)
         .map(state => state.court)
@@ -3955,17 +4370,28 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           const court = queue[next++];
           const availability = await fetchAvailability(court.code, SPORTS[selectedSport].type);
           if (runId !== courtSearchRunId) return;
-          updateResultCard(court, availabilitySummaryForSelectedRange(availability, court), nearby, resultStates);
+          const summary = resultStates.mode === 'play-now'
+            ? availabilitySummaryForPlayDate(availability, court)
+            : availabilitySummaryForSelectedRange(availability, court);
+          updateResultCard(court, summary, nearby, resultStates);
+          if (resultStates.rankByAvailability) syncResultCards(resultStates);
         }
       };
       await Promise.all([worker(), worker()]);
     }
 
     function renderCourtSearchResults(userLoc, errMsg, options = {}) {
-      initBookingPrefsIfNeeded();
+      const isPlayNow = options.mode === 'play-now' || options.mode === 'play-manual';
+      if (isPlayNow) {
+        selectedSport = 'tennis';
+        initPlayPrefsIfNeeded();
+        syncBookingPrefsForPlayDate();
+      } else {
+        initBookingPrefsIfNeeded();
+      }
       const sport = SPORTS[selectedSport];
-      const nearby = userLoc != null && options.mode !== 'manual';
-      const mode = nearby ? 'nearby' : 'manual';
+      const nearby = userLoc != null && !['manual', 'play-manual'].includes(options.mode);
+      const mode = isPlayNow ? 'play-now' : (nearby ? 'nearby' : 'manual');
       const courts = nearby
         ? courtsWithDistances(userLoc.lat, userLoc.lng)
         : courtsForSelectedSport();
@@ -3974,16 +4400,23 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         {
           court,
           index,
-          summary: initialResultSummaryForCourt(court, { mode }),
+          summary: initialResultSummaryForCourt(court, { mode: isPlayNow ? 'play-now' : mode }),
         },
       ]));
       resultStates.mode = mode;
+      resultStates.rankByAvailability = nearby;
       resultStates.visibleLimit = Math.min(RESULT_BATCH_SIZE, courts.length);
       resultStates.loadedCourtIds = new Set();
-      const title = nearby
+      const title = isPlayNow
+        ? (nearby ? 'Open courts near you' : 'Open tennis courts')
+        : nearby
         ? `${sport.label} near you`
         : 'Select a court';
-      const summary = nearby
+      const summary = isPlayNow
+        ? (nearby
+          ? `Showing nearby tennis courts with open time for ${formatPlayDateSummary()}.`
+          : `Choose a tennis court. Availability checks ${formatPlayDateSummary()}.`)
+        : nearby
         ? `Showing nearest courts for ${formatBookingWindow()}. Availability loads only for courts shown.`
         : `Choose a ${sport.label.toLowerCase()} court. We will check live availability only after you open that court.`;
 
@@ -3994,6 +4427,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         <h1>${title}</h1>
         <div class="search-summary">${summary}</div>
         ${errMsg ? `<div class="error">${errMsg}</div>` : ''}
+        ${isPlayNow ? playDatePickerHtml() : ''}
         <label class="court-filter" for="courtFilterInput">
           <span>Find a court</span>
           <input id="courtFilterInput" type="search" autocomplete="off" placeholder="Search by park name">
@@ -4004,11 +4438,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         <div class="empty-results" id="emptyResults" hidden>No courts match that search.</div>
         <button class="btn btn-secondary show-more-results" id="showMoreResultsBtn" type="button" hidden>Show more courts</button>
         <div class="results-toolbar">
-          <button class="btn btn-secondary" id="changeTimeBtn" type="button">Change time</button>
-          <a class="btn btn-ghost" id="manualAllBtn" href="${webtracAllCourtsUrl()}">WebTrac fallback</a>
+          <button class="btn btn-secondary" id="changeTimeBtn" type="button">${isPlayNow ? 'Reserve a court' : 'Change time'}</button>
+          <a class="btn btn-ghost" id="manualAllBtn" href="${webtracAllCourtsUrl()}" target="_blank" rel="noopener">Arlington WebTrac</a>
         </div>
       `;
       resetViewScroll();
+      if (isPlayNow) wirePlayDatePicker(userLoc, errMsg);
 
       card.querySelectorAll('a[data-result-court-id]').forEach(a => {
         a.addEventListener('click', (e) => {
@@ -4019,8 +4454,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           track('court_selected_from_results', {
             sport: selectedSport,
             court: courtId,
-            source: nearby ? 'nearby-availability' : 'manual-selection',
+            source: isPlayNow ? 'play-now' : (nearby ? 'nearby-availability' : 'manual-selection'),
           });
+          if (isPlayNow) {
+            rememberLastCourt(court.id);
+            window.open(webtracUrl(court.code), '_blank', 'noopener');
+            return;
+          }
           renderPostBooking(court, userLoc, { lockedWhen: true });
         });
       });
@@ -4032,7 +4472,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         loadVisibleCourtSearchAvailability(nearby, runId, resultStates);
         track('court_results_filtered', {
           sport: selectedSport,
-          source: nearby ? 'nearby-availability' : 'manual-selection',
+          source: isPlayNow ? 'play-now' : (nearby ? 'nearby-availability' : 'manual-selection'),
           hasQuery: normalizeCourtSearch(resultStates.query).length > 0,
         });
       });
@@ -4042,7 +4482,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         syncResultCards(resultStates);
         track('court_results_expanded', {
           sport: selectedSport,
-          source: nearby ? 'nearby-availability' : 'manual-selection',
+          source: isPlayNow ? 'play-now' : (nearby ? 'nearby-availability' : 'manual-selection'),
           visible: resultStates.visibleLimit,
         });
         loadVisibleCourtSearchAvailability(nearby, runId, resultStates);
