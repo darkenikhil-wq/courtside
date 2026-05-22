@@ -28,7 +28,7 @@ exports.handler = async (event) => {
 
   const apiKey = process.env.SCRAPER_API_KEY || process.env.SCRAPER_API;
   if (!apiKey) {
-    return jsonResponse(500, { error: 'SCRAPER_API_KEY or SCRAPER_API env var not set' });
+    return jsonResponse(500, { error: 'Availability is temporarily unavailable.' });
   }
 
   // Build the WebTrac search URL. Arlington courts close at 9pm, so the v3

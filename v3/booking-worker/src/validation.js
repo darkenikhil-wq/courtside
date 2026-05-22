@@ -1,5 +1,5 @@
 const ALLOWED_DURATIONS = new Set([60, 90]);
-const ALLOWED_SPORT_TYPES = new Set(['TENNIS', 'PICKLE', 'VBALL']);
+const ALLOWED_SPORT_TYPES = new Set(['TENNIS', 'PICKLE']);
 const FIRST_START_MINS = 8 * 60;
 const CLOSE_MINS = 21 * 60;
 
