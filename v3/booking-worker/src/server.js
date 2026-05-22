@@ -560,7 +560,7 @@ function validateAvailabilityQuery(query) {
   if (!courtCode || !/^[A-Z0-9-]{2,12}$/.test(courtCode)) {
     return fail('BAD_COURT', 'Court is not configured for availability.');
   }
-  if (!['TENNIS', 'PICKLE', 'VBALL'].includes(sportType)) {
+  if (!['TENNIS', 'PICKLE'].includes(sportType)) {
     return fail('BAD_SPORT', 'Sport is not supported.');
   }
   if (!/^\d{2}\/\d{2}\/\d{4}$/.test(dateWebtrac)) {

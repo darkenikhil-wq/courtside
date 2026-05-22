@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Courtside Reservations — Arlington courts in two taps</title>
-  <meta name="description" content="Scan, geolocate, book. The fastest way to reserve Arlington tennis, pickleball, and volleyball courts.">
+  <title>Courtside Reservations — Find open Arlington courts</title>
+  <meta name="description" content="Find nearby Arlington tennis and pickleball courts, then open the official Arlington booking page.">
   <meta name="theme-color" content="#0A0F16">
 
   <!-- Google site verification (for Google Workspace business email setup) -->
@@ -20,7 +20,7 @@
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://courtsidereservations.com/">
   <meta property="og:title" content="Courtside Reservations">
-  <meta property="og:description" content="Book Arlington tennis, pickleball, and volleyball courts in two taps.">
+  <meta property="og:description" content="Find nearby Arlington tennis and pickleball courts, then open the official Arlington booking page.">
   <meta property="og:image" content="https://courtsidereservations.com/og.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
@@ -28,7 +28,7 @@
   <!-- Twitter card -->
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Courtside Reservations">
-  <meta name="twitter:description" content="Book Arlington tennis, pickleball, and volleyball courts in two taps.">
+  <meta name="twitter:description" content="Find nearby Arlington tennis and pickleball courts, then open the official Arlington booking page.">
   <meta name="twitter:image" content="https://courtsidereservations.com/og.png">
 
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700;9..144,900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -1322,7 +1322,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     //     notes     (string)  — short one-liner (e.g. "Walk-up only on weekends")
     //   These are NOT filled in yet — fill in as you confirm each.
     const COURTS = [
-      { id: 'barcroft',           name: 'Barcroft Park',                         lat: 38.8505704, lng: -77.1020494, code: 'BARCR', sports: ['tennis', 'volleyball'] },
+      { id: 'barcroft',           name: 'Barcroft Park',                         lat: 38.8505704, lng: -77.1020494, code: 'BARCR', sports: ['tennis'] },
       { id: 'bluemont',           name: 'Bluemont Park',                         lat: 38.8695020, lng: -77.1323060, code: 'BLUE',  sports: ['tennis'] },
       { id: 'bon-air',            name: 'Bon Air Park',                          lat: 38.8755314, lng: -77.1325117, code: 'BONA',  sports: ['tennis'] },
       { id: 'carver',             name: 'Carver Community Center',               lat: 38.8617358, lng: -77.0711967, code: 'CARV',  sports: ['tennis'] },
@@ -1340,20 +1340,17 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       { id: 'madison-manor',      name: 'Madison Manor Park',                    lat: 38.8825550, lng: -77.1498390, code: 'MADM',  sports: ['tennis'] },
       { id: 'marcey-road',        name: 'Marcey Road Park',                      lat: 38.9108386, lng: -77.1095795, code: 'MARCY', sports: ['tennis', 'pickleball'] },
       { id: 'maury',              name: 'Maury Park',                            lat: 38.8819386, lng: -77.1024012, code: 'MAURY', sports: ['tennis'] },
-      { id: 'quincy',             name: 'Quincy Park',                           lat: 38.8856109, lng: -77.1079805, code: 'QUINC', sports: ['tennis', 'volleyball'] },
+      { id: 'quincy',             name: 'Quincy Park',                           lat: 38.8856109, lng: -77.1079805, code: 'QUINC', sports: ['tennis'] },
       { id: 'stratford',          name: 'Stratford Park',                        lat: 38.8997830, lng: -77.1136080, code: 'STRAT', sports: ['tennis'] },
       { id: 'thomas-jefferson',   name: 'Thomas Jefferson Community Center',     lat: 38.8705019, lng: -77.0958233, code: 'TJ',    sports: ['tennis'] },
-      { id: 'towers',             name: 'Towers Park',                           lat: 38.8671088, lng: -77.0776606, code: 'TOWER', sports: ['tennis', 'volleyball'] },
+      { id: 'towers',             name: 'Towers Park',                           lat: 38.8671088, lng: -77.0776606, code: 'TOWER', sports: ['tennis'] },
       { id: 'tuckahoe',           name: 'Tuckahoe Park',                         lat: 38.8922180, lng: -77.1578750, code: 'TUCKP', sports: ['tennis'] },
-      { id: 'utah',               name: 'Utah Park',                             lat: 38.8379943, lng: -77.0859565, code: 'UTAH',  sports: ['volleyball'] },
-      { id: 'virginia-highlands', name: 'Virginia Highlands Park',               lat: 38.8587766, lng: -77.0599123, code: 'VA-H',  sports: ['tennis', 'volleyball', 'pickleball'] },
-      { id: 'westover',           name: 'Westover Park',                         lat: 38.8801792, lng: -77.1357306, code: 'WESTO', sports: ['volleyball'] },
+      { id: 'virginia-highlands', name: 'Virginia Highlands Park',               lat: 38.8587766, lng: -77.0599123, code: 'VA-H',  sports: ['tennis', 'pickleball'] },
     ];
 
     const SPORTS = {
       tennis:     { type: 'TENNIS', label: 'Tennis' },
       pickleball: { type: 'PICKLE', label: 'Pickleball' },
-      volleyball: { type: 'VBALL',  label: 'Volleyball' },
     };
     let selectedSport = 'tennis';  // default fallback
 
@@ -1420,12 +1417,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         { id: 'pb-league', label: 'Leagues',      icon: 'trophy',    url: '?view=coming-soon&cat=pickleball-league' },
         { id: 'pb-gear',   label: 'Gear',         icon: 'bag',       url: 'https://www.pickleballcentral.com/' },
         { id: 'pb-work',   label: 'Work with us', icon: 'briefcase', url: '?view=work-with-us' },
-      ],
-      volleyball: [
-        { id: 'vb-coach',  label: 'Coaches',      icon: 'coach',     url: '?view=coming-soon&cat=volleyball-coach' },
-        { id: 'vb-league', label: 'Leagues',      icon: 'trophy',    url: '?view=coming-soon&cat=volleyball-league' },
-        { id: 'vb-gear',   label: 'Gear',         icon: 'bag',       url: 'https://www.mvw.com/' },
-        { id: 'vb-work',   label: 'Work with us', icon: 'briefcase', url: '?view=work-with-us' },
       ],
     };
 
@@ -2074,13 +2065,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     function availabilitySummaryForSelectedRange(availability, court) {
       if (availability && availability.__error) {
-        const configError = /SCRAPER_API_KEY|env var|not configured/i.test(availability.message || '');
         return {
           tone: 'warn',
-          label: configError ? 'Setup needed' : 'Check manually',
-          detail: configError
-            ? 'Live availability is not configured on this deployment.'
-            : `Live availability did not load for ${formatBookingWindow()}.`,
+          label: 'Check manually',
+          detail: `Availability did not load for ${formatBookingWindow()}.`,
           rankBucket: 2,
           openCount: 0,
           totalCount: 0,
@@ -2179,13 +2167,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     function availabilitySummaryForPlayDate(availability, court) {
       if (availability && availability.__error) {
-        const configError = /SCRAPER_API_KEY|env var|not configured/i.test(availability.message || '');
         return {
           tone: 'warn',
-          label: configError ? 'Setup needed' : 'Check manually',
-          detail: configError
-            ? 'Live availability is not configured on this deployment.'
-            : `Live availability did not load for ${formatPlayDateLabel()}.`,
+          label: 'Check manually',
+          detail: `Availability did not load for ${formatPlayDateLabel()}.`,
           rankBucket: 4,
           openCount: 0,
           totalCount: 0,
@@ -2477,18 +2462,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (statusEl) statusEl.textContent = 'Checking availability…';
       const result = await fetchAvailability(court.code, sportType);
       if (result && result.__error) {
-        // Specific error message so you know WHY it failed in DevTools.
         clearAvailabilityFromTimeSelect();
         if (reserveBtn && !reserveBtn.hidden) {
           reserveBtn.disabled = false;
           reserveBtn.textContent = 'Continue to booking';
         }
         if (statusEl) {
-          const hint = result.status === 404 ? 'function not deployed'
-                     : result.status === 500 ? 'env var likely missing'
-                     : result.status === 502 ? 'scraper rejected'
-                     : 'check console';
-          statusEl.textContent = `Couldn't load availability (${result.status || 'network'}) — ${hint}`;
+          statusEl.textContent = 'We could not check live availability right now. You can still open Arlington WebTrac to confirm.';
         }
         return;
       }
@@ -2953,18 +2933,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         <circle cx="50" cy="50" r="46" fill="#d4ec3d"/>
         <path d="M 10 35 Q 50 50 10 65" stroke="#ffffff" stroke-width="3" fill="none" stroke-linecap="round"/>
         <path d="M 90 35 Q 50 50 90 65" stroke="#ffffff" stroke-width="3" fill="none" stroke-linecap="round"/>`,
-      volleyball: `
-        <!-- White ball base -->
-        <circle cx="50" cy="50" r="46" fill="#ffffff"/>
-        <!-- Yellow upper sweep (Mikasa-style curved panel) -->
-        <path d="M 6 32 Q 30 8 50 6 Q 72 8 94 32 Q 70 18 50 22 Q 30 18 6 32 Z" fill="#FACC15"/>
-        <!-- Blue lower sweep -->
-        <path d="M 6 68 Q 30 92 50 94 Q 72 92 94 68 Q 70 82 50 78 Q 30 82 6 68 Z" fill="#2563EB"/>
-        <!-- Middle equatorial panel lines (subtle seams) -->
-        <path d="M 4 50 Q 50 34 96 50" stroke="#0F172A" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.55"/>
-        <path d="M 4 50 Q 50 66 96 50" stroke="#0F172A" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.55"/>
-        <!-- Outer ring -->
-        <circle cx="50" cy="50" r="46" fill="none" stroke="#0F172A" stroke-width="2.5"/>`,
       pickleball: `
         <circle cx="50" cy="50" r="46" fill="#FDE047"/>
         <g fill="#854D0E" opacity="0.9">
@@ -3002,7 +2970,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       <div class="sport-trio">
         ${sportIconSvg('tennis', false)}
         ${sportIconSvg('pickleball', false)}
-        ${sportIconSvg('volleyball', false)}
       </div>`;
 
     function renderQrDisplay() {
@@ -3114,12 +3081,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         ${recentHtml}
         <div class="home-actions">
           <button class="btn btn-primary home-primary" id="playNowBtn" type="button">
-            <span>Core MVP</span>
+            <span>Nearby courts</span>
             Find open courts near me
           </button>
           <button class="btn btn-secondary" id="reserveFlowBtn" type="button">Reserve a court</button>
         </div>
-        <p class="home-secondary-note">Reserve mode still lets you choose a sport, date, time, and court before opening Arlington WebTrac.</p>
+        <p class="home-secondary-note">Planning ahead? Choose a sport, day, time, and court before opening Arlington WebTrac.</p>
         <div class="home-mini-grid">${buttons}</div>
         <a href="#" class="inline-link" data-action="share" data-cta-id="home-share"
            style="display: inline-block; margin-top: 18px; font-size: 14px;">Share Courtside →</a>
@@ -3171,7 +3138,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }
     }
 
-    function backLinkHtml(label = '← Sports') {
+    function backLinkHtml(label = '← Home') {
       return `<button class="back-link" id="backLink">${label}</button>`;
     }
     function wireBackLink(onBack = renderSportPicker) {
@@ -3661,7 +3628,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         <button class="back-link" id="bookAnotherBtn" style="position: static; margin: 6px auto 0;">↻ Book another</button>
       `;
 
-      const detailBackLabel = court ? '← Courts' : '← Sports';
+      const detailBackLabel = court ? '← Courts' : '← Home';
       card.innerHTML = `
         ${backLinkHtml(detailBackLabel)}
         ${header}
@@ -4224,8 +4191,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (disabled) {
         return {
           tone: 'warn',
-          label: 'Setup',
-          detail: 'WebTrac setup needed',
+          label: 'Check manually',
+          detail: 'Open Arlington WebTrac to confirm.',
           rankBucket: 4,
           openCount: 0,
           totalCount: court.numCourts || 0,
