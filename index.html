@@ -1402,9 +1402,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     // Each CTA: id (used for tracking), label, icon (key in ICONS), url
     // External URLs open in a new tab; internal routes ("?view=...") open in same tab.
     // TODO: Replace placeholders below with real affiliate / payment URLs as you get them.
-    // External gear URLs — currently raw vendor URLs. TODO: replace each with
-    // your affiliate URL once you sign up (Tennis Warehouse, Pickleball Central
-    // and Midwest Volleyball Warehouse all have affiliate programs).
+    // External gear URLs are currently raw vendor URLs. Replace each with your
+    // affiliate URL once those partnerships are set up.
     const POST_BOOKING_CTAS = {
       tennis: [
         { id: 't-coach',  label: 'Coaches',      icon: 'coach',     url: '?view=coaches' },
@@ -2373,7 +2372,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         .replace(/\bFacility Reservation\b/ig, '')
         .replace(/\bTennis\b/ig, '')
         .replace(/\bPickleball\b/ig, '')
-        .replace(/\bVolleyball\b/ig, '')
         .replace(/\s+/g, ' ')
         .trim();
       const courtNumber = raw.match(/\b(?:court|ct)\s*#?\s*([0-9]+[A-Z]?)\b/i)
